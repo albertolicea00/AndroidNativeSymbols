@@ -1,3 +1,19 @@
 <resources>
     <color name="launcher_background">#FFFFFF</color>
+    <color name="primary">#34A853</color>
+    <color name="on_primary">#0B2D16</color>
+    <color name="accent_light">#176D39</color>
+    <color name="accent_dark">#86DFA0</color>
+    <color name="background_light">#F7FAF8</color>
+    <color name="surface_light">#FFFFFF</color>
+    <color name="code_light">#F0F6F1</color>
+    <color name="ink_light">#1B2A20</color>
+    <color name="muted_light">#5F7165</color>
+    <color name="line_light">#DCE7DF</color>
+    <color name="background_dark">#101712</color>
+    <color name="surface_dark">#1C271F</color>
+    <color name="code_dark">#142017</color>
+    <color name="ink_dark">#F0F7F1</color>
+    <color name="muted_dark">#A7B9AA</color>
+    <color name="line_dark">#35483A</color>
 </resources>

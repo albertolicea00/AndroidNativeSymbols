@@ -6,7 +6,7 @@ import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.res.ColorStateList;
-import android.graphics.Color;
+import android.content.res.Configuration;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
@@ -34,12 +34,20 @@ import java.util.List;
 import java.util.Locale;
 
 public class MainActivity extends Activity {
-    private static final int INK = Color.rgb(29, 35, 55);
-    private static final int MUTED = Color.rgb(105, 113, 135);
-    private static final int BLUE = Color.rgb(66, 99, 235);
-    private static final int LINE = Color.rgb(226, 230, 240);
-    private static final int SURFACE = Color.WHITE;
-    private static final int BACKGROUND = Color.rgb(248, 249, 253);
+    private static final String PREFS = "appearance";
+    private static final String THEME_KEY = "theme_mode";
+
+    private int ink;
+    private int muted;
+    private int primary;
+    private int onPrimary;
+    private int accentText;
+    private int line;
+    private int surface;
+    private int background;
+    private int codeBackground;
+    private boolean darkMode;
+    private String themeMode;
 
     private final List<IconItem> items = new ArrayList<>();
     private final List<TextView> filterViews = new ArrayList<>();
@@ -70,14 +78,61 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onCreate(Bundle state) {
+        themeMode = getSharedPreferences(PREFS, MODE_PRIVATE).getString(THEME_KEY, "system");
+        boolean systemDark = (getResources().getConfiguration().uiMode
+                & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
+        darkMode = "dark".equals(themeMode) || ("system".equals(themeMode) && systemDark);
+        setTheme(darkMode ? R.style.AppThemeDark : R.style.AppThemeLight);
         super.onCreate(state);
-        getWindow().setStatusBarColor(BACKGROUND);
-        getWindow().setNavigationBarColor(BACKGROUND);
-        getWindow().getDecorView().setSystemUiVisibility(
-                View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
+        applyPalette();
+        getWindow().setStatusBarColor(background);
+        getWindow().setNavigationBarColor(background);
+        getWindow().getDecorView().setSystemUiVisibility(darkMode ? 0
+                : View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
+        if (state != null) filter = state.getInt("filter", 0);
         loadIcons();
         buildScreen();
+        if (state != null) searchView.setText(state.getString("query", ""));
         renderResults();
+    }
+
+    @Override
+    protected void onSaveInstanceState(Bundle outState) {
+        outState.putInt("filter", filter);
+        if (searchView != null) outState.putString("query", searchView.getText().toString());
+        super.onSaveInstanceState(outState);
+    }
+
+    private void applyPalette() {
+        primary = getColor(R.color.primary);
+        onPrimary = getColor(R.color.on_primary);
+        accentText = getColor(darkMode ? R.color.accent_dark : R.color.accent_light);
+        background = getColor(darkMode ? R.color.background_dark : R.color.background_light);
+        surface = getColor(darkMode ? R.color.surface_dark : R.color.surface_light);
+        codeBackground = getColor(darkMode ? R.color.code_dark : R.color.code_light);
+        ink = getColor(darkMode ? R.color.ink_dark : R.color.ink_light);
+        muted = getColor(darkMode ? R.color.muted_dark : R.color.muted_light);
+        line = getColor(darkMode ? R.color.line_dark : R.color.line_light);
+    }
+
+    private void showAppearanceDialog() {
+        String[] choices = { "Use device setting", "Light", "Dark" };
+        String[] modes = { "system", "light", "dark" };
+        int selected = "light".equals(themeMode) ? 1 : "dark".equals(themeMode) ? 2 : 0;
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle("Appearance")
+                .setSingleChoiceItems(choices, selected, (selectedDialog, which) -> {
+                    selectedDialog.dismiss();
+                    if (!modes[which].equals(themeMode)) {
+                        getSharedPreferences(PREFS, MODE_PRIVATE).edit()
+                                .putString(THEME_KEY, modes[which]).apply();
+                        recreate();
+                    }
+                })
+                .setNegativeButton("Cancel", null)
+                .create();
+        dialog.show();
+        dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setTextColor(accentText);
     }
 
     private void loadIcons() {
@@ -116,7 +171,7 @@ public class MainActivity extends Activity {
     private void buildScreen() {
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setBackgroundColor(BACKGROUND);
+        root.setBackgroundColor(background);
         root.setPadding(dp(20), dp(18), dp(20), 0);
         if (Build.VERSION.SDK_INT >= 30) {
             getWindow().setDecorFitsSystemWindows(false);
@@ -130,16 +185,30 @@ public class MainActivity extends Activity {
         }
         setContentView(root);
 
-        TextView eyebrow = text("ANDROID ICON LIBRARY", 11, BLUE, true);
-        eyebrow.setLetterSpacing(0.13f);
-        root.addView(eyebrow);
+        LinearLayout topRow = new LinearLayout(this);
+        topRow.setGravity(Gravity.CENTER_VERTICAL);
+        root.addView(topRow, new LinearLayout.LayoutParams(-1, dp(36)));
 
-        TextView title = text("Native Symbols", 31, INK, true);
+        TextView eyebrow = text("ANDROID ICON LIBRARY", 11, accentText, true);
+        eyebrow.setLetterSpacing(0.13f);
+        topRow.addView(eyebrow, new LinearLayout.LayoutParams(0, -2, 1));
+
+        String modeLabel = "dark".equals(themeMode) ? "DARK"
+                : "light".equals(themeMode) ? "LIGHT" : "SYSTEM";
+        TextView appearance = text("THEME: " + modeLabel, 11, accentText, true);
+        appearance.setGravity(Gravity.CENTER);
+        appearance.setPadding(dp(10), dp(7), dp(10), dp(7));
+        appearance.setBackground(shape(surface, line, 10));
+        appearance.setContentDescription("Choose appearance, current setting " + modeLabel);
+        appearance.setOnClickListener(v -> showAppearanceDialog());
+        topRow.addView(appearance);
+
+        TextView title = text("Native Symbols", 31, ink, true);
         LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(-1, -2);
         titleParams.topMargin = dp(5);
         root.addView(title, titleParams);
 
-        TextView description = text("Explore icons and copy ready-to-use Android code.", 14, MUTED, false);
+        TextView description = text("Explore icons and copy ready-to-use Android code.", 14, muted, false);
         LinearLayout.LayoutParams descriptionParams = new LinearLayout.LayoutParams(-1, -2);
         descriptionParams.topMargin = dp(5);
         root.addView(description, descriptionParams);
@@ -147,13 +216,14 @@ public class MainActivity extends Activity {
         searchView = new EditText(this);
         searchView.setSingleLine(true);
         searchView.setTextSize(15);
-        searchView.setTextColor(INK);
-        searchView.setHintTextColor(MUTED);
+        searchView.setTextColor(ink);
+        searchView.setHintTextColor(muted);
         searchView.setHint("Search icons by name");
-        searchView.setBackground(shape(SURFACE, LINE, 14));
+        searchView.setBackground(shape(surface, line, 14));
         searchView.setPadding(dp(16), 0, dp(16), 0);
         searchView.setCompoundDrawablePadding(dp(8));
         searchView.setCompoundDrawablesWithIntrinsicBounds(android.R.drawable.ic_menu_search, 0, 0, 0);
+        searchView.setCompoundDrawableTintList(ColorStateList.valueOf(muted));
         LinearLayout.LayoutParams searchParams = new LinearLayout.LayoutParams(-1, dp(52));
         searchParams.topMargin = dp(24);
         root.addView(searchView, searchParams);
@@ -171,7 +241,7 @@ public class MainActivity extends Activity {
         String[] labels = { "All", "Material", "System" };
         for (int i = 0; i < labels.length; i++) {
             final int selected = i;
-            TextView chip = text(labels[i], 13, MUTED, true);
+            TextView chip = text(labels[i], 13, muted, true);
             chip.setGravity(Gravity.CENTER);
             LinearLayout.LayoutParams chipParams = new LinearLayout.LayoutParams(0, -1, 1);
             if (i > 0) chipParams.leftMargin = dp(8);
@@ -181,7 +251,7 @@ public class MainActivity extends Activity {
         }
         updateFilters();
 
-        countView = text("", 13, MUTED, false);
+        countView = text("", 13, muted, false);
         LinearLayout.LayoutParams countParams = new LinearLayout.LayoutParams(-1, -2);
         countParams.topMargin = dp(18);
         countParams.bottomMargin = dp(10);
@@ -202,8 +272,8 @@ public class MainActivity extends Activity {
         for (int i = 0; i < filterViews.size(); i++) {
             TextView chip = filterViews.get(i);
             boolean selected = i == filter;
-            chip.setTextColor(selected ? Color.WHITE : MUTED);
-            chip.setBackground(shape(selected ? BLUE : SURFACE, selected ? BLUE : LINE, 12));
+            chip.setTextColor(selected ? onPrimary : muted);
+            chip.setBackground(shape(selected ? primary : surface, selected ? primary : line, 12));
         }
     }
 
@@ -237,7 +307,7 @@ public class MainActivity extends Activity {
             }
         }
         if (visible.isEmpty()) {
-            TextView empty = text("No icons found. Try another name.", 15, MUTED, false);
+            TextView empty = text("No icons found. Try another name.", 15, muted, false);
             empty.setGravity(Gravity.CENTER);
             results.addView(empty, new LinearLayout.LayoutParams(-1, dp(180)));
         }
@@ -248,22 +318,22 @@ public class MainActivity extends Activity {
         card.setOrientation(LinearLayout.VERTICAL);
         card.setGravity(Gravity.CENTER);
         card.setPadding(dp(5), dp(10), dp(5), dp(7));
-        card.setBackground(shape(SURFACE, LINE, 15));
+        card.setBackground(shape(surface, line, 15));
         card.setClickable(true);
         card.setFocusable(true);
         card.setContentDescription(displayName(item.name) + ", " + (item.material ? "Material" : "System"));
         ImageView image = new ImageView(this);
         image.setImageResource(item.resourceId);
-        image.setImageTintList(ColorStateList.valueOf(INK));
+        image.setImageTintList(ColorStateList.valueOf(ink));
         card.addView(image, new LinearLayout.LayoutParams(dp(32), dp(32)));
-        TextView name = text(displayName(item.name), 11, INK, true);
+        TextView name = text(displayName(item.name), 11, ink, true);
         name.setGravity(Gravity.CENTER);
         name.setMaxLines(2);
         name.setEllipsize(android.text.TextUtils.TruncateAt.END);
         LinearLayout.LayoutParams nameParams = new LinearLayout.LayoutParams(-1, dp(34));
         nameParams.topMargin = dp(10);
         card.addView(name, nameParams);
-        TextView source = text(item.material ? "MATERIAL" : "SYSTEM", 9, item.material ? BLUE : MUTED, true);
+        TextView source = text(item.material ? "MATERIAL" : "SYSTEM", 9, item.material ? accentText : muted, true);
         source.setLetterSpacing(0.08f);
         card.addView(source);
         card.setOnClickListener(v -> showDetails(item));
@@ -275,22 +345,23 @@ public class MainActivity extends Activity {
         LinearLayout content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
         content.setPadding(dp(20), dp(22), dp(20), dp(20));
+        content.setBackgroundColor(surface);
         scroll.addView(content);
 
         ImageView preview = new ImageView(this);
         preview.setImageResource(item.resourceId);
-        preview.setImageTintList(ColorStateList.valueOf(BLUE));
+        preview.setImageTintList(ColorStateList.valueOf(primary));
         LinearLayout.LayoutParams previewParams = new LinearLayout.LayoutParams(dp(56), dp(56));
         previewParams.gravity = Gravity.CENTER_HORIZONTAL;
         content.addView(preview, previewParams);
 
-        TextView title = text(displayName(item.name), 22, INK, true);
+        TextView title = text(displayName(item.name), 22, ink, true);
         title.setGravity(Gravity.CENTER);
         LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(-1, -2);
         titleParams.topMargin = dp(12);
         content.addView(title, titleParams);
 
-        TextView kind = text(item.material ? "LOCAL MATERIAL VECTOR" : "ANDROID SYSTEM DRAWABLE", 11, BLUE, true);
+        TextView kind = text(item.material ? "LOCAL MATERIAL VECTOR" : "ANDROID SYSTEM DRAWABLE", 11, accentText, true);
         kind.setGravity(Gravity.CENTER);
         kind.setLetterSpacing(0.08f);
         LinearLayout.LayoutParams kindParams = new LinearLayout.LayoutParams(-1, -2);
@@ -300,7 +371,7 @@ public class MainActivity extends Activity {
         TextView note = text(item.material
                 ? "Add this vector XML to res/drawable before using the snippets below."
                 : "This drawable is supplied by Android. Its appearance may vary across devices.",
-                13, MUTED, false);
+                13, muted, false);
         note.setGravity(Gravity.CENTER);
         LinearLayout.LayoutParams noteParams = new LinearLayout.LayoutParams(-1, -2);
         noteParams.topMargin = dp(13);
@@ -321,6 +392,7 @@ public class MainActivity extends Activity {
         AlertDialog dialog = new AlertDialog.Builder(this).setView(scroll)
                 .setPositiveButton("Done", null).create();
         dialog.show();
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(accentText);
         if (dialog.getWindow() != null) {
             dialog.getWindow().setLayout(getResources().getDisplayMetrics().widthPixels - dp(28),
                     Math.min(getResources().getDisplayMetrics().heightPixels - dp(80), dp(720)));
@@ -331,7 +403,7 @@ public class MainActivity extends Activity {
         LinearLayout block = new LinearLayout(this);
         block.setOrientation(LinearLayout.VERTICAL);
         block.setPadding(dp(14), dp(12), dp(14), dp(12));
-        block.setBackground(shape(BACKGROUND, LINE, 12));
+        block.setBackground(shape(codeBackground, line, 12));
         LinearLayout.LayoutParams blockParams = new LinearLayout.LayoutParams(-1, -2);
         blockParams.topMargin = dp(14);
         parent.addView(block, blockParams);
@@ -339,9 +411,9 @@ public class MainActivity extends Activity {
         LinearLayout header = new LinearLayout(this);
         header.setGravity(Gravity.CENTER_VERTICAL);
         block.addView(header);
-        TextView label = text(heading, 12, INK, true);
+        TextView label = text(heading, 12, ink, true);
         header.addView(label, new LinearLayout.LayoutParams(0, -2, 1));
-        TextView copy = text("COPY", 12, BLUE, true);
+        TextView copy = text("COPY", 12, accentText, true);
         copy.setPadding(dp(8), dp(4), dp(2), dp(4));
         header.addView(copy);
         copy.setOnClickListener(v -> copyText(heading, code));
@@ -352,7 +424,7 @@ public class MainActivity extends Activity {
         LinearLayout.LayoutParams codeParams = new LinearLayout.LayoutParams(-1, -2);
         codeParams.topMargin = dp(8);
         block.addView(hScroll, codeParams);
-        TextView codeView = text(code, 12, MUTED, false);
+        TextView codeView = text(code, 12, muted, false);
         codeView.setTypeface(Typeface.MONOSPACE);
         codeView.setTextIsSelectable(true);
         hScroll.addView(codeView);

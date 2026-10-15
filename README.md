@@ -29,6 +29,7 @@ A small, fully native Android app for exploring icons and copying the code neede
 - 🔎 Search by icon name and preview each drawable.
 - 📋 Copy ready-to-use XML layout, Kotlin, and Java snippets.
 - 🧩 Copy the complete vector XML for a bundled Material icon.
+- 🌓 Follow the device theme or choose Light or Dark in the app. The primary color is `#34A853`.
 
 ## 🎨 Icon sources
 
