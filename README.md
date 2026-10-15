@@ -36,9 +36,9 @@ A small, fully native Android app for exploring icons and copying the code neede
 | Catalog | Contents | How it works |
 | --- | --- | --- |
 | 🧩 Material | 2,122 bundled classic Material Icons (Filled style) | Android vector XML files in `app/src/main/res/drawable/`, with matching copies in `app/src/main/assets/vectors/` for copying |
-| 🤖 System | Public `android.R.drawable` resources available on the device | Discovered at runtime; no files or icon dependency are added to the app |
+| 🤖 System | Icon resources from `android.R.drawable` available on the device | Discovered at runtime; frames, button backgrounds, and other non-icon drawables are excluded |
 
-The Material catalog contains every Filled icon in the `@material-design-icons/svg` 0.14.15 package. The other four classic styles and the newer Material Symbols collection are separate catalogs. System icons can look different across Android versions and device themes. The app tints previews for a consistent catalog view; copied resource references use the drawable in your own app.
+The Material catalog contains every Filled icon in the `@material-design-icons/svg` 0.14.15 package. The other four classic styles and the newer Material Symbols collection are separate catalogs. System icons can look different across Android versions and device themes. Some older System icons have soft edges or shadows in the Android resource itself. The app tints previews for a consistent catalog view; copied resource references use the drawable in your own app.
 
 ### 📦 App size
 

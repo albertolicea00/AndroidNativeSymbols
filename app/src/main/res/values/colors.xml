@@ -17,4 +17,10 @@
     <color name="ink_dark">#F0F7F1</color>
     <color name="muted_dark">#A7B9AA</color>
     <color name="line_dark">#35483A</color>
+    <color name="syntax_purple_light">#7040A0</color>
+    <color name="syntax_purple_dark">#C7A5F4</color>
+    <color name="syntax_blue_light">#245FA0</color>
+    <color name="syntax_blue_dark">#8DBEFA</color>
+    <color name="syntax_orange_light">#9B500F</color>
+    <color name="syntax_orange_dark">#F0B67D</color>
 </resources>

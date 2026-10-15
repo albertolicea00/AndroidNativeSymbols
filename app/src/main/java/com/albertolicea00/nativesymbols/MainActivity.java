@@ -13,7 +13,10 @@ import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.os.Build;
 import android.text.Editable;
+import android.text.SpannableString;
+import android.text.Spanned;
 import android.text.TextWatcher;
+import android.text.style.ForegroundColorSpan;
 import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
@@ -38,6 +41,8 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class MainActivity extends Activity {
     private static final String PREFS = "appearance";
@@ -152,6 +157,7 @@ public class MainActivity extends Activity {
 
         for (Field field : android.R.drawable.class.getFields()) {
             if (field.getType() != int.class || !Modifier.isStatic(field.getModifiers())) continue;
+            if (!isSystemIconName(field.getName())) continue;
             try {
                 int id = field.getInt(null);
                 getDrawable(id);
@@ -166,6 +172,12 @@ public class MainActivity extends Activity {
                 return a.name.compareToIgnoreCase(b.name);
             }
         });
+    }
+
+    private boolean isSystemIconName(String name) {
+        return name.startsWith("ic_") || name.startsWith("stat_")
+                || name.startsWith("sym_") || name.startsWith("presence_")
+                || name.startsWith("star_");
     }
 
     private void buildScreen() {
@@ -380,6 +392,7 @@ public class MainActivity extends Activity {
         card.setContentDescription(displayName(item.name));
         ImageView image = new ImageView(this);
         image.setImageResource(item.resourceId);
+        if (!item.material) image.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
         image.setImageTintList(ColorStateList.valueOf(ink));
         int iconSize = Math.min(dp(44), Math.round(cardSize * 0.42f));
         card.addView(image, new LinearLayout.LayoutParams(iconSize, iconSize));
@@ -404,6 +417,7 @@ public class MainActivity extends Activity {
         row.setContentDescription(displayName(item.name));
         ImageView image = new ImageView(this);
         image.setImageResource(item.resourceId);
+        if (!item.material) image.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
         image.setImageTintList(ColorStateList.valueOf(ink));
         row.addView(image, new LinearLayout.LayoutParams(dp(36), dp(36)));
         TextView name = text(displayName(item.name), 15, iconNameColor, true);
@@ -454,12 +468,13 @@ public class MainActivity extends Activity {
         sheet.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
         LinearLayout content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
-        content.setPadding(dp(20), 0, dp(20), dp(24));
+        content.setPadding(dp(12), 0, dp(12), dp(24));
         content.setBackgroundColor(surface);
         scroll.addView(content);
 
         ImageView preview = new ImageView(this);
         preview.setImageResource(item.resourceId);
+        if (!item.material) preview.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
         preview.setImageTintList(ColorStateList.valueOf(primary));
         LinearLayout.LayoutParams previewParams = new LinearLayout.LayoutParams(dp(56), dp(56));
         previewParams.gravity = Gravity.CENTER_HORIZONTAL;
@@ -602,7 +617,7 @@ public class MainActivity extends Activity {
         block.setPadding(dp(14), dp(12), dp(14), dp(12));
         block.setBackground(shape(codeBackground, line));
         LinearLayout.LayoutParams blockParams = new LinearLayout.LayoutParams(-1, -2);
-        blockParams.topMargin = dp(14);
+        blockParams.topMargin = dp(8);
         parent.addView(block, blockParams);
 
         LinearLayout header = new LinearLayout(this);
@@ -621,10 +636,40 @@ public class MainActivity extends Activity {
         LinearLayout.LayoutParams codeParams = new LinearLayout.LayoutParams(-1, -2);
         codeParams.topMargin = dp(8);
         block.addView(hScroll, codeParams);
-        TextView codeView = text(code, 12, muted, false);
+        TextView codeView = text(code, 12, ink, false);
         codeView.setTypeface(Typeface.MONOSPACE);
+        codeView.setText(highlightCode(heading, code));
         codeView.setTextIsSelectable(true);
         hScroll.addView(codeView);
+    }
+
+    private SpannableString highlightCode(String heading, String code) {
+        SpannableString highlighted = new SpannableString(code);
+        int purple = getColor(darkMode ? R.color.syntax_purple_dark : R.color.syntax_purple_light);
+        int blue = getColor(darkMode ? R.color.syntax_blue_dark : R.color.syntax_blue_light);
+        int orange = getColor(darkMode ? R.color.syntax_orange_dark : R.color.syntax_orange_light);
+        if (heading.equals("XML layout") || heading.equals("Vector drawable XML")) {
+            colorMatches(highlighted, "</?([A-Za-z][\\w.-]*)", 1, purple);
+            colorMatches(highlighted, "\\b([A-Za-z_:][\\w:.-]*)(?=\\s*=)", 1, blue);
+            colorMatches(highlighted, "\"[^\"\\n]*\"", 0, orange);
+            colorMatches(highlighted, "(?s)<!--.*?-->", 0, muted);
+        } else {
+            colorMatches(highlighted, "\\b(?:new|val|var|fun|import|class|public|private|static|final|void)\\b", 0, purple);
+            colorMatches(highlighted, "\\b(?:ImageView|R|android)\\b", 0, blue);
+            colorMatches(highlighted, "\\.([A-Za-z_]\\w*)(?=\\()", 1, purple);
+            colorMatches(highlighted, "(?:android\\.)?R\\.drawable\\.[A-Za-z_]\\w*", 0, accentText);
+            colorMatches(highlighted, "\"[^\"\\n]*\"", 0, orange);
+            colorMatches(highlighted, "(?m)//[^\\n]*", 0, muted);
+        }
+        return highlighted;
+    }
+
+    private void colorMatches(SpannableString text, String regex, int group, int color) {
+        Matcher matcher = Pattern.compile(regex).matcher(text);
+        while (matcher.find()) {
+            text.setSpan(new ForegroundColorSpan(color), matcher.start(group), matcher.end(group),
+                    Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        }
     }
 
     private void copyText(String label, String value) {
