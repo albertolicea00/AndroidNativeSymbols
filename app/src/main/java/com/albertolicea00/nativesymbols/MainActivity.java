@@ -312,17 +312,28 @@ public class MainActivity extends Activity {
         updateFilters();
         List<IconItem> visible = filter == 0 ? systemMatches : materialMatches;
         results.removeAllViews();
+        int contentWidth = results.getWidth() > 0
+                ? results.getWidth() - results.getPaddingLeft() - results.getPaddingRight()
+                : getResources().getDisplayMetrics().widthPixels
+                        - results.getPaddingLeft() - results.getPaddingRight();
         if (listLayout) {
-            for (IconItem item : visible) {
-                LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(-1, dp(56));
-                rowParams.setMargins(dp(1), dp(1), dp(1), dp(1));
-                results.addView(iconListRow(item), rowParams);
+            int minimumColumns = getResources().getConfiguration().orientation
+                    == Configuration.ORIENTATION_LANDSCAPE ? 2 : 1;
+            int columns = Math.max(minimumColumns, Math.min(4, contentWidth / dp(240)));
+            int gap = dp(1);
+            for (int start = 0; start < visible.size(); start += columns) {
+                LinearLayout row = new LinearLayout(this);
+                row.setOrientation(LinearLayout.HORIZONTAL);
+                results.addView(row, new LinearLayout.LayoutParams(-1, dp(56) + 2 * gap));
+                for (int col = 0; col < columns; col++) {
+                    LinearLayout.LayoutParams cellParams = new LinearLayout.LayoutParams(0, dp(56), 1);
+                    cellParams.setMargins(gap, gap, gap, gap);
+                    int index = start + col;
+                    if (index < visible.size()) row.addView(iconListRow(visible.get(index)), cellParams);
+                    else row.addView(new View(this), cellParams);
+                }
             }
         } else {
-            int contentWidth = results.getWidth() > 0
-                    ? results.getWidth() - results.getPaddingLeft() - results.getPaddingRight()
-                    : getResources().getDisplayMetrics().widthPixels
-                            - results.getPaddingLeft() - results.getPaddingRight();
             int columns = Math.max(2, Math.min(8, contentWidth / dp(84)));
             int gap = dp(1);
             int cardSize = contentWidth / columns - 2 * gap;
