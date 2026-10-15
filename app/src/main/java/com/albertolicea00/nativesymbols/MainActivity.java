@@ -5,8 +5,10 @@ import android.app.AlertDialog;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
+import android.content.Intent;
 import android.content.res.ColorStateList;
 import android.content.res.Configuration;
+import android.net.Uri;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
@@ -59,6 +61,7 @@ public class MainActivity extends Activity {
     private boolean darkMode;
     private boolean listLayout;
     private ImageView layoutButton;
+    private FrameLayout infoPage;
 
     private final List<IconItem> items = new ArrayList<>();
     private final List<LinearLayout> filterViews = new ArrayList<>();
@@ -231,6 +234,7 @@ public class MainActivity extends Activity {
                 ? new LinearLayout.LayoutParams(0, dp(52), 2)
                 : new LinearLayout.LayoutParams(-1, dp(42));
         controls.addView(filters, filtersParams);
+
         String[] labels = { "System", "Material" };
         for (int i = 0; i < labels.length; i++) {
             final int selected = i;
@@ -292,6 +296,17 @@ public class MainActivity extends Activity {
         bottomBar.addView(layoutButton, layoutParams);
         layoutButton.setOnClickListener(v -> toggleLayout());
         updateLayoutButton();
+
+        ImageView infoButton = new ImageView(this);
+        infoButton.setImageResource(R.drawable.ic_md_info);
+        infoButton.setImageTintList(ColorStateList.valueOf(accentText));
+        infoButton.setPadding(dp(14), dp(14), dp(14), dp(14));
+        infoButton.setBackground(shape(surface, line));
+        infoButton.setClickable(true);
+        infoButton.setFocusable(true);
+        infoButton.setContentDescription("App information");
+        bottomBar.addView(infoButton, new LinearLayout.LayoutParams(dp(52), dp(52)));
+        infoButton.setOnClickListener(v -> showInfoPage());
     }
 
     private LinearLayout pageRoot() {
@@ -316,10 +331,175 @@ public class MainActivity extends Activity {
 
     @Override
     public void onBackPressed() {
-        if (detailOverlay != null) {
+        if (infoPage != null) {
+            dismissInfoPage();
+        } else if (detailOverlay != null) {
             dismissDetails();
         } else {
             super.onBackPressed();
+        }
+    }
+
+    private void showInfoPage() {
+        if (infoPage != null) return;
+        searchView.clearFocus();
+        android.view.inputmethod.InputMethodManager keyboard = (android.view.inputmethod.InputMethodManager)
+                getSystemService(Context.INPUT_METHOD_SERVICE);
+        if (keyboard != null) keyboard.hideSoftInputFromWindow(searchView.getWindowToken(), 0);
+
+        boolean landscape = getResources().getConfiguration().orientation
+                == Configuration.ORIENTATION_LANDSCAPE;
+        FrameLayout overlay = new FrameLayout(this);
+        overlay.setBackgroundColor(0x66000000);
+        overlay.setOnClickListener(v -> dismissInfoPage());
+        infoPage = overlay;
+        screen.addView(overlay, new FrameLayout.LayoutParams(-1, -1));
+        Runnable dismiss = this::dismissInfoPage;
+
+        LinearLayout sheet = new LinearLayout(this);
+        sheet.setOrientation(LinearLayout.VERTICAL);
+        sheet.setClickable(true);
+        GradientDrawable sheetBackground = new GradientDrawable();
+        sheetBackground.setColor(surface);
+        sheet.setBackground(sheetBackground);
+
+        FrameLayout header = new FrameLayout(this);
+        sheet.addView(header, new LinearLayout.LayoutParams(-1, dp(48)));
+        View handle = new View(this);
+        GradientDrawable handleBackground = new GradientDrawable();
+        handleBackground.setColor(muted);
+        handleBackground.setCornerRadius(dp(2));
+        FrameLayout.LayoutParams handleParams = new FrameLayout.LayoutParams(
+                dp(36), dp(4), Gravity.TOP | Gravity.CENTER_HORIZONTAL);
+        handleParams.topMargin = dp(8);
+        header.addView(handle, handleParams);
+
+        ImageView close = new ImageView(this);
+        close.setImageResource(R.drawable.ic_md_close);
+        close.setImageTintList(ColorStateList.valueOf(ink));
+        close.setPadding(dp(12), dp(12), dp(12), dp(12));
+        close.setContentDescription("Close app information");
+        close.setClickable(true);
+        close.setFocusable(true);
+        FrameLayout.LayoutParams closeParams = new FrameLayout.LayoutParams(
+                dp(48), dp(48), Gravity.TOP | Gravity.END);
+        closeParams.rightMargin = dp(8);
+        header.addView(close, closeParams);
+        close.setOnClickListener(v -> dismissInfoPage());
+
+        ScrollView scroll = detailScroll(sheet, dismiss);
+        scroll.setFillViewport(true);
+        scroll.setVerticalScrollBarEnabled(false);
+        sheet.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setPadding(dp(24), 0, dp(24), dp(28));
+        scroll.addView(content);
+
+        ImageView logo = new ImageView(this);
+        logo.setImageResource(R.drawable.native_symbols_logo);
+        logo.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        LinearLayout.LayoutParams logoParams = new LinearLayout.LayoutParams(
+                dp(landscape ? 96 : 132), dp(landscape ? 96 : 132));
+        logoParams.gravity = Gravity.CENTER_HORIZONTAL;
+        content.addView(logo, logoParams);
+
+        TextView byline = text("by @albertolicea00", 14, accentText, true);
+        byline.setGravity(Gravity.CENTER);
+        byline.setClickable(true);
+        byline.setFocusable(true);
+        byline.setContentDescription("GitHub profile: albertolicea00");
+        byline.setOnClickListener(v -> openExternalUrl("https://github.com/albertolicea00"));
+        LinearLayout.LayoutParams bylineParams = new LinearLayout.LayoutParams(-1, -2);
+        bylineParams.topMargin = dp(4);
+        content.addView(byline, bylineParams);
+
+        TextView description = text("Browse Android system drawables and +2k classic Material Icons. Search by name, preview icons, and copy XML, Kotlin, and Java examples. The catalog works offline.",
+                15, ink, false);
+        description.setGravity(Gravity.CENTER);
+        description.setLineSpacing(dp(4), 1f);
+        LinearLayout.LayoutParams descriptionParams = new LinearLayout.LayoutParams(-1, -2);
+        descriptionParams.topMargin = dp(24);
+        content.addView(description, descriptionParams);
+
+        LinearLayout.LayoutParams linksParams = new LinearLayout.LayoutParams(-1, -2);
+        linksParams.topMargin = dp(22);
+        LinearLayout links = new LinearLayout(this);
+        links.setOrientation(LinearLayout.VERTICAL);
+        links.setGravity(Gravity.CENTER_HORIZONTAL);
+        content.addView(links, linksParams);
+        addInfoLink(links, "GitHub repository", "https://github.com/albertolicea00/AndroidNativeSymbols");
+        addInfoLink(links, "Privacy Policy", "https://github.com/albertolicea00/AndroidNativeSymbols/blob/main/PRIVACY.md");
+
+        TextView build = text("Version " + appVersionName() + "  ·  Build " + appVersionCode(),
+                12, muted, false);
+        build.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams buildParams = new LinearLayout.LayoutParams(-1, -2);
+        buildParams.topMargin = dp(10);
+        content.addView(build, buildParams);
+        TextView minimum = text("Android 6.0 and later", 11, muted, false);
+        minimum.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams minimumParams = new LinearLayout.LayoutParams(-1, -2);
+        minimumParams.topMargin = dp(3);
+        content.addView(minimum, minimumParams);
+
+        header.setOnTouchListener(sheetDragListener(sheet, dismiss));
+        int sheetHeight = Math.round((screen.getHeight() > 0
+                ? screen.getHeight() : getResources().getDisplayMetrics().heightPixels) * 0.8f);
+        overlay.addView(sheet, new FrameLayout.LayoutParams(-1, sheetHeight, Gravity.BOTTOM));
+        if (Build.VERSION.SDK_INT >= 30) {
+            overlay.setOnApplyWindowInsetsListener((view, insets) -> {
+                android.graphics.Insets bars = insets.getInsets(WindowInsets.Type.systemBars());
+                sheet.setPadding(bars.left, 0, bars.right, bars.bottom);
+                return insets;
+            });
+            overlay.requestApplyInsets();
+        }
+    }
+
+    private void dismissInfoPage() {
+        if (infoPage != null) {
+            screen.removeView(infoPage);
+            infoPage = null;
+        }
+    }
+
+    private String appVersionName() {
+        try {
+            return getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
+        } catch (Exception ignored) {
+            return "1.0";
+        }
+    }
+
+    private String appVersionCode() {
+        try {
+            android.content.pm.PackageInfo info = getPackageManager().getPackageInfo(getPackageName(), 0);
+            return String.valueOf(Build.VERSION.SDK_INT >= 28 ? info.getLongVersionCode() : info.versionCode);
+        } catch (Exception ignored) {
+            return "1";
+        }
+    }
+
+    private void addInfoLink(LinearLayout parent, String label, String url) {
+        TextView link = text(label, 15, accentText, true);
+        link.setPadding(dp(14), dp(10), dp(14), dp(10));
+        link.setGravity(Gravity.CENTER);
+        link.setBackground(shape(surface, line));
+        link.setClickable(true);
+        link.setFocusable(true);
+        link.setContentDescription(label + ", opens in browser");
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(dp(240), dp(48));
+        params.topMargin = parent.getChildCount() == 0 ? 0 : dp(5);
+        parent.addView(link, params);
+        link.setOnClickListener(v -> openExternalUrl(url));
+    }
+
+    private void openExternalUrl(String url) {
+        try {
+            startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
+        } catch (Exception ignored) {
+            Toast.makeText(this, "No browser available", Toast.LENGTH_SHORT).show();
         }
     }
 
