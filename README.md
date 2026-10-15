@@ -35,10 +35,14 @@ A small, fully native Android app for exploring icons and copying the code neede
 
 | Catalog | Contents | How it works |
 | --- | --- | --- |
-| 🧩 Material | 38 bundled vector drawables | XML files stored in `app/src/main/res/drawable/` and listed from matching files in `app/src/main/assets/vectors/` |
+| 🧩 Material | 2,122 bundled classic Material Icons (Filled style) | Android vector XML files in `app/src/main/res/drawable/`, with matching copies in `app/src/main/assets/vectors/` for copying |
 | 🤖 System | Public `android.R.drawable` resources available on the device | Discovered at runtime; no files or icon dependency are added to the app |
 
-The Material catalog is a bundled selection, not the entire Android Studio Vector Asset library. System icons can look different across Android versions and device themes. The app tints previews for a consistent catalog view; copied resource references use the drawable in your own app.
+The Material catalog contains every Filled icon in the `@material-design-icons/svg` 0.14.15 package. The other four classic styles and the newer Material Symbols collection are separate catalogs. System icons can look different across Android versions and device themes. The app tints previews for a consistent catalog view; copied resource references use the drawable in your own app.
+
+### 📦 App size
+
+The current debug APK is about **3.1 MB**. The packaged Material vector files and their copyable XML assets account for about **1.6 MB** of it. Expanding the catalog from 38 to 2,122 icons added roughly **1.5 MB**. These are measurements of the debug APK; download and installed sizes can differ by build and device.
 
 ## 🛠️ Requirements
 
@@ -92,6 +96,21 @@ The detail view also provides Kotlin equivalents and complete `ImageView` XML ex
 
 Android Studio can create a vector drawable with **New → Vector Asset**. No catalog list needs to be edited.
 
+### 🔄 Update the bundled Material icons
+
+The app bundles its icons, so updates require rebuilding and releasing a new APK. Check the [SVG package versions](https://www.npmjs.com/package/@material-design-icons/svg?activeTab=versions) for a release newer than the currently bundled **0.14.15**. If one exists, replace the version in the commands below:
+
+```bash
+version=0.14.15
+curl -L --fail "https://registry.npmjs.org/@material-design-icons/svg/-/svg-${version}.tgz" -o /tmp/material-icons-svg.tgz
+python3 tools/import_material_icons.py /tmp/material-icons-svg.tgz
+./gradlew :app:assembleDebug
+```
+
+The import script adds new Filled icons and replaces existing icons with the same names in both `res/drawable/` and `assets/vectors/`. Review the changed files and update the version and icon count in this README. If an upstream icon was removed, remove its XML from both directories manually. The Android app itself does not require npm or an internet connection.
+
+Google says the classic [Material Icons set is no longer updated](https://github.com/google/material-design-icons#material-symbols--material-icons); new Google designs now go into **Material Symbols**, which would need a separate import rather than this Filled icon update process.
+
 ## 🖼️ Launcher icon
 
 `icon.svg` is the source artwork. Generated PNGs under `app/src/main/res/mipmap-*/` support older Android versions, while `mipmap-anydpi-v26/ic_launcher.xml` defines the adaptive icon for Android 8.0 and later.
@@ -106,4 +125,4 @@ This optional asset-generation step requires `rsvg-convert` and Python's Pillow 
 
 ## 📄 Credits and license
 
-The bundled Material vectors come from [Google's Material Design Icons repository](https://github.com/google/material-design-icons) and are licensed under [Apache License 2.0](MATERIAL_ICONS_LICENSE). Android system drawables are supplied by the operating system at runtime.
+The bundled Material vectors were converted from [`@material-design-icons/svg` 0.14.15](https://www.npmjs.com/package/@material-design-icons/svg), which packages Google's [classic Material Icons](https://github.com/google/material-design-icons). They are licensed under [Apache License 2.0](MATERIAL_ICONS_LICENSE). Android system drawables are supplied by the operating system at runtime.
