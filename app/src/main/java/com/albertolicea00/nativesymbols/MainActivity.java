@@ -35,19 +35,7 @@ import java.util.Locale;
 
 public class MainActivity extends Activity {
     private static final String PREFS = "appearance";
-    private static final String THEME_KEY = "theme_mode";
-    private static final String COLOR_KEY = "app_color";
     private static final String LAYOUT_KEY = "icon_layout";
-    private static final int PAGE_CATALOG = 0;
-    private static final int PAGE_SETTINGS = 1;
-    private static final int PAGE_APPEARANCE = 2;
-    private static final int PAGE_COLOR = 3;
-    private static final int PAGE_LAYOUT = 4;
-    private static final String[] COLOR_NAMES = { "Green", "Blue", "Purple", "Orange" };
-    private static final int[] PRIMARY_COLORS = { 0xFF34A853, 0xFF1A73E8, 0xFF9334E6, 0xFFF9AB00 };
-    private static final int[] ON_PRIMARY_COLORS = { 0xFF0B2D16, 0xFFFFFFFF, 0xFFFFFFFF, 0xFF3A2500 };
-    private static final int[] ACCENT_LIGHT_COLORS = { 0xFF176D39, 0xFF1558B0, 0xFF6F2DA8, 0xFF9C5200 };
-    private static final int[] ACCENT_DARK_COLORS = { 0xFF86DFA0, 0xFF8AB4F8, 0xFFD8B4FE, 0xFFFFC978 };
 
     private int ink;
     private int muted;
@@ -59,9 +47,8 @@ public class MainActivity extends Activity {
     private int background;
     private int codeBackground;
     private boolean darkMode;
-    private String themeMode;
-    private int colorIndex;
     private boolean listLayout;
+    private ImageView layoutButton;
 
     private final List<IconItem> items = new ArrayList<>();
     private final List<LinearLayout> filterViews = new ArrayList<>();
@@ -70,8 +57,6 @@ public class MainActivity extends Activity {
     private LinearLayout results;
     private EditText searchView;
     private int filter = 0;
-    private int page = PAGE_CATALOG;
-    private String query = "";
 
     private static final class IconItem {
         final String name;
@@ -95,13 +80,9 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onCreate(Bundle state) {
-        themeMode = getSharedPreferences(PREFS, MODE_PRIVATE).getString(THEME_KEY, "system");
-        colorIndex = Math.max(0, Math.min(COLOR_NAMES.length - 1,
-                getSharedPreferences(PREFS, MODE_PRIVATE).getInt(COLOR_KEY, 0)));
         listLayout = getSharedPreferences(PREFS, MODE_PRIVATE).getBoolean(LAYOUT_KEY, false);
-        boolean systemDark = (getResources().getConfiguration().uiMode
+        darkMode = (getResources().getConfiguration().uiMode
                 & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
-        darkMode = "dark".equals(themeMode) || ("system".equals(themeMode) && systemDark);
         setTheme(darkMode ? R.style.AppThemeDark : R.style.AppThemeLight);
         super.onCreate(state);
         applyPalette();
@@ -109,36 +90,24 @@ public class MainActivity extends Activity {
         getWindow().setNavigationBarColor(background);
         getWindow().getDecorView().setSystemUiVisibility(darkMode ? 0
                 : View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
-        if (state != null) {
-            filter = Math.max(0, Math.min(1, state.getInt("filter", 0)));
-            page = Math.max(PAGE_CATALOG, Math.min(PAGE_LAYOUT, state.getInt("page", PAGE_CATALOG)));
-            query = state.getString("query", "");
-        }
+        if (state != null) filter = Math.max(0, Math.min(1, state.getInt("filter", 0)));
         loadIcons();
-        if (page == PAGE_CATALOG) buildScreen();
-        else buildSettingsPage();
+        buildScreen();
+        if (state != null) searchView.setText(state.getString("query", ""));
+        renderResults();
     }
 
     @Override
     protected void onSaveInstanceState(Bundle outState) {
         outState.putInt("filter", filter);
-        outState.putInt("page", page);
-        outState.putString("query", page == PAGE_CATALOG && searchView != null
-                ? searchView.getText().toString() : query);
+        if (searchView != null) outState.putString("query", searchView.getText().toString());
         super.onSaveInstanceState(outState);
     }
 
-    @Override
-    public void onBackPressed() {
-        if (page >= PAGE_APPEARANCE) showPage(PAGE_SETTINGS);
-        else if (page == PAGE_SETTINGS) showPage(PAGE_CATALOG);
-        else super.onBackPressed();
-    }
-
     private void applyPalette() {
-        primary = PRIMARY_COLORS[colorIndex];
-        onPrimary = ON_PRIMARY_COLORS[colorIndex];
-        accentText = darkMode ? ACCENT_DARK_COLORS[colorIndex] : ACCENT_LIGHT_COLORS[colorIndex];
+        primary = getColor(R.color.primary);
+        onPrimary = getColor(R.color.on_primary);
+        accentText = getColor(darkMode ? R.color.accent_dark : R.color.accent_light);
         background = getColor(darkMode ? R.color.background_dark : R.color.background_light);
         surface = getColor(darkMode ? R.color.surface_dark : R.color.surface_light);
         codeBackground = getColor(darkMode ? R.color.code_dark : R.color.code_light);
@@ -234,18 +203,6 @@ public class MainActivity extends Activity {
             filterCounts.add(badge);
             chip.setOnClickListener(v -> { filter = selected; updateFilters(); renderResults(); });
         }
-        ImageView settings = new ImageView(this);
-        settings.setImageResource(R.drawable.ic_md_settings);
-        settings.setImageTintList(ColorStateList.valueOf(accentText));
-        settings.setPadding(dp(10), dp(10), dp(10), dp(10));
-        settings.setBackground(shape(surface, line));
-        settings.setContentDescription("Settings");
-        settings.setClickable(true);
-        settings.setFocusable(true);
-        LinearLayout.LayoutParams settingsParams = new LinearLayout.LayoutParams(dp(42), dp(42));
-        settingsParams.leftMargin = dp(8);
-        filters.addView(settings, settingsParams);
-        settings.setOnClickListener(v -> showPage(PAGE_SETTINGS));
         updateFilters();
 
         ScrollView scroll = new ScrollView(this);
@@ -258,28 +215,40 @@ public class MainActivity extends Activity {
         results.setPadding(0, 0, 0, dp(24));
         scroll.addView(results);
 
+        LinearLayout bottomBar = new LinearLayout(this);
+        bottomBar.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout.LayoutParams bottomParams = new LinearLayout.LayoutParams(-1, dp(52));
+        bottomParams.topMargin = dp(8);
+        bottomParams.bottomMargin = dp(8);
+        root.addView(bottomBar, bottomParams);
+
         searchView = new EditText(this);
         searchView.setSingleLine(true);
         searchView.setTextSize(15);
         searchView.setTextColor(ink);
         searchView.setHintTextColor(muted);
-        searchView.setHint("Search Material and System icons");
+        searchView.setHint("Search icons");
         searchView.setBackground(shape(surface, line));
         searchView.setPadding(dp(16), 0, dp(16), 0);
         searchView.setCompoundDrawablePadding(dp(8));
         searchView.setCompoundDrawablesWithIntrinsicBounds(android.R.drawable.ic_menu_search, 0, 0, 0);
         searchView.setCompoundDrawableTintList(ColorStateList.valueOf(muted));
-        LinearLayout.LayoutParams searchParams = new LinearLayout.LayoutParams(-1, dp(52));
-        searchParams.topMargin = dp(8);
-        searchParams.bottomMargin = dp(8);
-        root.addView(searchView, searchParams);
+        bottomBar.addView(searchView, new LinearLayout.LayoutParams(0, dp(52), 1));
         searchView.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) { }
             @Override public void onTextChanged(CharSequence s, int start, int before, int count) { renderResults(); }
             @Override public void afterTextChanged(Editable s) { }
         });
-        searchView.setText(query);
-        renderResults();
+
+        layoutButton = new ImageView(this);
+        layoutButton.setPadding(dp(12), dp(12), dp(12), dp(12));
+        layoutButton.setBackground(shape(surface, line));
+        layoutButton.setClickable(true);
+        layoutButton.setFocusable(true);
+        LinearLayout.LayoutParams layoutParams = new LinearLayout.LayoutParams(dp(52), dp(52));
+        bottomBar.addView(layoutButton, layoutParams);
+        layoutButton.setOnClickListener(v -> toggleLayout());
+        updateLayoutButton();
     }
 
     private LinearLayout pageRoot() {
@@ -301,160 +270,17 @@ public class MainActivity extends Activity {
         return root;
     }
 
-    private void showPage(int nextPage) {
-        if (page == PAGE_CATALOG && searchView != null) {
-            query = searchView.getText().toString();
-            searchView.clearFocus();
-        }
-        page = nextPage;
-        if (page == PAGE_CATALOG) buildScreen();
-        else buildSettingsPage();
-    }
-
-    private void buildSettingsPage() {
-        LinearLayout root = pageRoot();
-        String title = page == PAGE_SETTINGS ? "Settings"
-                : page == PAGE_APPEARANCE ? "Appearance"
-                : page == PAGE_COLOR ? "App color" : "Icon layout";
-
-        LinearLayout header = new LinearLayout(this);
-        header.setGravity(Gravity.CENTER_VERTICAL);
-        root.addView(header, new LinearLayout.LayoutParams(-1, dp(56)));
-        ImageView back = new ImageView(this);
-        back.setImageResource(R.drawable.ic_md_arrow_back);
-        back.setImageTintList(ColorStateList.valueOf(ink));
-        back.setPadding(dp(10), dp(10), dp(10), dp(10));
-        back.setBackground(shape(surface, line));
-        back.setContentDescription("Back");
-        back.setClickable(true);
-        back.setFocusable(true);
-        header.addView(back, new LinearLayout.LayoutParams(dp(42), dp(42)));
-        back.setOnClickListener(v -> showPage(page == PAGE_SETTINGS ? PAGE_CATALOG : PAGE_SETTINGS));
-
-        TextView heading = text(title, 27, ink, true);
-        LinearLayout.LayoutParams headingParams = new LinearLayout.LayoutParams(-1, -2);
-        headingParams.leftMargin = dp(14);
-        header.addView(heading, headingParams);
-
-        ScrollView scroll = new ScrollView(this);
-        scroll.setFillViewport(true);
-        scroll.setVerticalScrollBarEnabled(false);
-        root.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
-        LinearLayout content = new LinearLayout(this);
-        content.setOrientation(LinearLayout.VERTICAL);
-        content.setPadding(0, dp(14), 0, dp(24));
-        scroll.addView(content);
-
-        String description = page == PAGE_SETTINGS ? "Customize Native Symbols."
-                : page == PAGE_APPEARANCE ? "Choose how the app looks."
-                : page == PAGE_COLOR ? "Choose the app's main color."
-                : "Choose how icons appear.";
-        TextView intro = text(description, 14, muted, false);
-        LinearLayout.LayoutParams introParams = new LinearLayout.LayoutParams(-1, -2);
-        introParams.bottomMargin = dp(12);
-        content.addView(intro, introParams);
-
-        if (page == PAGE_SETTINGS) {
-            String appearance = "dark".equals(themeMode) ? "Dark"
-                    : "light".equals(themeMode) ? "Light" : "System";
-            addSettingsLink(content, "Appearance", appearance, PAGE_APPEARANCE);
-            addSettingsLink(content, "App color", COLOR_NAMES[colorIndex], PAGE_COLOR);
-            addSettingsLink(content, "Icon layout", listLayout ? "List" : "Grid", PAGE_LAYOUT);
-        } else if (page == PAGE_APPEARANCE) {
-            addSettingsOption(content, "System", "Follow device setting",
-                    "system".equals(themeMode), 0, () -> selectTheme("system"));
-            addSettingsOption(content, "Light", "Always use the light theme",
-                    "light".equals(themeMode), 0, () -> selectTheme("light"));
-            addSettingsOption(content, "Dark", "Always use the dark theme",
-                    "dark".equals(themeMode), 0, () -> selectTheme("dark"));
-        } else if (page == PAGE_COLOR) {
-            for (int i = 0; i < COLOR_NAMES.length; i++) {
-                final int selected = i;
-                String hex = String.format(Locale.ROOT, "#%06X", PRIMARY_COLORS[i] & 0xFFFFFF);
-                addSettingsOption(content, COLOR_NAMES[i], hex,
-                        colorIndex == i, PRIMARY_COLORS[i], () -> selectColor(selected));
-            }
-        } else {
-            addSettingsOption(content, "Grid", "Compact icon cards",
-                    !listLayout, 0, () -> selectLayout(false));
-            addSettingsOption(content, "List", "Full-width icon rows",
-                    listLayout, 0, () -> selectLayout(true));
-        }
-    }
-
-    private void addSettingsLink(LinearLayout parent, String title, String value, int destination) {
-        LinearLayout row = settingsRow(parent, false);
-        addSettingsText(row, title, value);
-        TextView arrow = text("›", 28, muted, false);
-        arrow.setGravity(Gravity.CENTER);
-        row.addView(arrow, new LinearLayout.LayoutParams(dp(24), -1));
-        row.setContentDescription(title + ", " + value);
-        row.setOnClickListener(v -> showPage(destination));
-    }
-
-    private void addSettingsOption(LinearLayout parent, String title, String detail,
-                                   boolean selected, int swatchColor, Runnable action) {
-        LinearLayout row = settingsRow(parent, selected);
-        if (swatchColor != 0) {
-            View swatch = new View(this);
-            swatch.setBackground(shape(swatchColor, swatchColor));
-            LinearLayout.LayoutParams swatchParams = new LinearLayout.LayoutParams(dp(28), dp(28));
-            swatchParams.rightMargin = dp(14);
-            row.addView(swatch, swatchParams);
-        }
-        addSettingsText(row, title, detail);
-        if (selected) {
-            ImageView check = new ImageView(this);
-            check.setImageResource(R.drawable.ic_md_check);
-            check.setImageTintList(ColorStateList.valueOf(accentText));
-            row.addView(check, new LinearLayout.LayoutParams(dp(24), dp(24)));
-        }
-        row.setContentDescription(title + (selected ? ", selected" : ""));
-        row.setOnClickListener(v -> action.run());
-    }
-
-    private LinearLayout settingsRow(LinearLayout parent, boolean selected) {
-        LinearLayout row = new LinearLayout(this);
-        row.setGravity(Gravity.CENTER_VERTICAL);
-        row.setPadding(dp(16), 0, dp(16), 0);
-        row.setBackground(shape(surface, selected ? primary : line));
-        row.setClickable(true);
-        row.setFocusable(true);
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, dp(76));
-        params.topMargin = dp(8);
-        parent.addView(row, params);
-        return row;
-    }
-
-    private void addSettingsText(LinearLayout row, String title, String detail) {
-        LinearLayout labels = new LinearLayout(this);
-        labels.setOrientation(LinearLayout.VERTICAL);
-        LinearLayout.LayoutParams labelsParams = new LinearLayout.LayoutParams(0, -2, 1);
-        row.addView(labels, labelsParams);
-        labels.addView(text(title, 16, ink, true));
-        TextView subtitle = text(detail, 13, muted, false);
-        LinearLayout.LayoutParams subtitleParams = new LinearLayout.LayoutParams(-1, -2);
-        subtitleParams.topMargin = dp(4);
-        labels.addView(subtitle, subtitleParams);
-    }
-
-    private void selectTheme(String mode) {
-        if (mode.equals(themeMode)) return;
-        getSharedPreferences(PREFS, MODE_PRIVATE).edit().putString(THEME_KEY, mode).apply();
-        recreate();
-    }
-
-    private void selectColor(int selected) {
-        if (selected == colorIndex) return;
-        getSharedPreferences(PREFS, MODE_PRIVATE).edit().putInt(COLOR_KEY, selected).apply();
-        recreate();
-    }
-
-    private void selectLayout(boolean selectedList) {
-        if (selectedList == listLayout) return;
-        listLayout = selectedList;
+    private void toggleLayout() {
+        listLayout = !listLayout;
         getSharedPreferences(PREFS, MODE_PRIVATE).edit().putBoolean(LAYOUT_KEY, listLayout).apply();
-        buildSettingsPage();
+        updateLayoutButton();
+        renderResults();
+    }
+
+    private void updateLayoutButton() {
+        layoutButton.setImageResource(listLayout ? R.drawable.ic_layout_grid : R.drawable.ic_layout_list);
+        layoutButton.setImageTintList(ColorStateList.valueOf(accentText));
+        layoutButton.setContentDescription(listLayout ? "Switch to grid view" : "Switch to list view");
     }
 
     private void updateFilters() {
