@@ -2,6 +2,7 @@ package com.albertolicea00.nativesymbols;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.app.Dialog;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
@@ -14,9 +15,12 @@ import android.os.Build;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.view.Gravity;
+import android.view.MotionEvent;
 import android.view.View;
+import android.view.Window;
 import android.view.WindowInsets;
 import android.widget.EditText;
+import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
@@ -409,10 +413,48 @@ public class MainActivity extends Activity {
     }
 
     private void showDetails(IconItem item) {
-        ScrollView scroll = new ScrollView(this);
+        Dialog dialog = new Dialog(this);
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        LinearLayout sheet = new LinearLayout(this);
+        sheet.setOrientation(LinearLayout.VERTICAL);
+        GradientDrawable sheetBackground = new GradientDrawable();
+        sheetBackground.setColor(surface);
+        float radius = dp(20);
+        sheetBackground.setCornerRadii(new float[] { radius, radius, radius, radius, 0, 0, 0, 0 });
+        sheet.setBackground(sheetBackground);
+        sheet.setClipToOutline(true);
+
+        FrameLayout header = new FrameLayout(this);
+        sheet.addView(header, new LinearLayout.LayoutParams(-1, dp(56)));
+        View handle = new View(this);
+        GradientDrawable handleBackground = new GradientDrawable();
+        handleBackground.setColor(muted);
+        handleBackground.setCornerRadius(dp(2));
+        handle.setBackground(handleBackground);
+        FrameLayout.LayoutParams handleParams = new FrameLayout.LayoutParams(dp(36), dp(4), Gravity.TOP | Gravity.CENTER_HORIZONTAL);
+        handleParams.topMargin = dp(12);
+        header.addView(handle, handleParams);
+
+        ImageView close = new ImageView(this);
+        close.setImageResource(R.drawable.ic_md_close);
+        close.setImageTintList(ColorStateList.valueOf(ink));
+        close.setPadding(dp(12), dp(12), dp(12), dp(12));
+        close.setContentDescription("Close icon details");
+        close.setClickable(true);
+        close.setFocusable(true);
+        FrameLayout.LayoutParams closeParams = new FrameLayout.LayoutParams(dp(48), dp(48), Gravity.TOP | Gravity.END);
+        closeParams.rightMargin = dp(8);
+        closeParams.topMargin = dp(4);
+        header.addView(close, closeParams);
+        close.setOnClickListener(v -> dialog.dismiss());
+
+        ScrollView scroll = detailScroll(sheet, dialog);
+        scroll.setFillViewport(true);
+        scroll.setVerticalScrollBarEnabled(false);
+        sheet.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
         LinearLayout content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
-        content.setPadding(dp(20), dp(22), dp(20), dp(20));
+        content.setPadding(dp(20), dp(8), dp(20), dp(24));
         content.setBackgroundColor(surface);
         scroll.addView(content);
 
@@ -457,14 +499,98 @@ public class MainActivity extends Activity {
             } catch (Exception ignored) { }
         }
 
-        AlertDialog dialog = new AlertDialog.Builder(this).setView(scroll)
-                .setPositiveButton("Done", null).create();
+        header.setOnTouchListener(sheetDragListener(sheet, dialog));
+        dialog.setContentView(sheet);
         dialog.show();
-        styleDialog(dialog);
-        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(accentText);
         if (dialog.getWindow() != null) {
-            dialog.getWindow().setLayout(getResources().getDisplayMetrics().widthPixels - dp(28),
-                    Math.min(getResources().getDisplayMetrics().heightPixels - dp(80), dp(720)));
+            Window window = dialog.getWindow();
+            window.setBackgroundDrawableResource(android.R.color.transparent);
+            window.setGravity(Gravity.BOTTOM);
+            window.setLayout(-1, Math.round(getResources().getDisplayMetrics().heightPixels * 0.8f));
+        }
+    }
+
+    private ScrollView detailScroll(View sheet, Dialog dialog) {
+        return new ScrollView(this) {
+            private float startY;
+            private boolean dragging;
+
+            @Override public boolean onInterceptTouchEvent(MotionEvent event) {
+                if (event.getActionMasked() == MotionEvent.ACTION_DOWN) {
+                    startY = event.getRawY();
+                    dragging = false;
+                } else if (event.getActionMasked() == MotionEvent.ACTION_MOVE) {
+                    if (getScrollY() > 0) startY = event.getRawY();
+                    else if (event.getRawY() - startY > dp(12)) return true;
+                }
+                return super.onInterceptTouchEvent(event);
+            }
+
+            @Override public boolean onTouchEvent(MotionEvent event) {
+                switch (event.getActionMasked()) {
+                    case MotionEvent.ACTION_DOWN:
+                        startY = event.getRawY();
+                        dragging = false;
+                        break;
+                    case MotionEvent.ACTION_MOVE:
+                        if (getScrollY() > 0 && !dragging) startY = event.getRawY();
+                        else if (event.getRawY() - startY > dp(12)) dragging = true;
+                        if (dragging) {
+                            sheet.setTranslationY(Math.max(0, event.getRawY() - startY));
+                            return true;
+                        }
+                        break;
+                    case MotionEvent.ACTION_UP:
+                    case MotionEvent.ACTION_CANCEL:
+                        if (dragging) {
+                            finishSheetDrag(sheet, dialog, event);
+                            dragging = false;
+                            return true;
+                        }
+                        break;
+                }
+                return super.onTouchEvent(event);
+            }
+        };
+    }
+
+    private View.OnTouchListener sheetDragListener(View sheet, Dialog dialog) {
+        return new View.OnTouchListener() {
+            private float startY;
+            private boolean dragging;
+
+            @Override public boolean onTouch(View view, MotionEvent event) {
+                switch (event.getActionMasked()) {
+                    case MotionEvent.ACTION_DOWN:
+                        startY = event.getRawY();
+                        dragging = false;
+                        return true;
+                    case MotionEvent.ACTION_MOVE:
+                        float distance = event.getRawY() - startY;
+                        if (!dragging && distance > dp(12)) dragging = true;
+                        if (dragging) {
+                            sheet.setTranslationY(Math.max(0, distance));
+                        }
+                        return true;
+                    case MotionEvent.ACTION_UP:
+                    case MotionEvent.ACTION_CANCEL:
+                        if (dragging) {
+                            finishSheetDrag(sheet, dialog, event);
+                            dragging = false;
+                        }
+                        return true;
+                    default:
+                        return false;
+                }
+            }
+        };
+    }
+
+    private void finishSheetDrag(View sheet, Dialog dialog, MotionEvent event) {
+        if (event.getActionMasked() == MotionEvent.ACTION_UP && sheet.getTranslationY() > dp(100)) {
+            dialog.dismiss();
+        } else {
+            sheet.animate().translationY(0).setDuration(180).start();
         }
     }
 
