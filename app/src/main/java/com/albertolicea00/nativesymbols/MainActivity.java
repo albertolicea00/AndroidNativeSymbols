@@ -106,9 +106,14 @@ public class MainActivity extends Activity {
         super.onCreate(state);
         applyPalette();
         getWindow().setStatusBarColor(background);
-        getWindow().setNavigationBarColor(surface);
-        getWindow().getDecorView().setSystemUiVisibility(darkMode ? 0
-                : View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
+        int navigationBar = !darkMode && Build.VERSION.SDK_INT < 26
+                ? getColor(R.color.accent_light) : surface;
+        getWindow().setNavigationBarColor(navigationBar);
+        int systemUiVisibility = darkMode ? 0 : View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
+        if (!darkMode && Build.VERSION.SDK_INT >= 26) {
+            systemUiVisibility |= View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
+        }
+        getWindow().getDecorView().setSystemUiVisibility(systemUiVisibility);
         if (state != null) filter = Math.max(0, Math.min(1, state.getInt("filter", 0)));
         loadIcons();
         buildScreen();
@@ -204,8 +209,10 @@ public class MainActivity extends Activity {
             @Override public View getView(int position, View convertView, android.view.ViewGroup parent) {
                 View view = listLayout ? iconListRow(getItem(position))
                         : iconCard(getItem(position), resultCellSize);
+                int rowHeight = dp(Math.max(56,
+                        20 + 18 * Math.max(1f, getResources().getConfiguration().fontScale)));
                 view.setLayoutParams(new android.widget.AbsListView.LayoutParams(-1,
-                        listLayout ? dp(56) : resultCellSize));
+                        listLayout ? rowHeight : resultCellSize));
                 return view;
             }
         };
@@ -224,15 +231,17 @@ public class MainActivity extends Activity {
 
         boolean landscape = getResources().getConfiguration().orientation
                 == Configuration.ORIENTATION_LANDSCAPE;
+        float fontScale = Math.max(1f, getResources().getConfiguration().fontScale);
         LinearLayout controls = new LinearLayout(this);
         controls.setOrientation(landscape ? LinearLayout.HORIZONTAL : LinearLayout.VERTICAL);
         root.addView(controls, new LinearLayout.LayoutParams(-1, -2));
 
         LinearLayout filters = new LinearLayout(this);
         filters.setOrientation(LinearLayout.HORIZONTAL);
+        int filterHeight = dp(Math.max(landscape ? 52 : 48, 20 + 16 * fontScale));
         LinearLayout.LayoutParams filtersParams = landscape
-                ? new LinearLayout.LayoutParams(0, dp(52), 2)
-                : new LinearLayout.LayoutParams(-1, dp(42));
+                ? new LinearLayout.LayoutParams(0, filterHeight, 2)
+                : new LinearLayout.LayoutParams(-1, filterHeight);
         controls.addView(filters, filtersParams);
 
         String[] labels = { "System", "Material" };
@@ -242,12 +251,17 @@ public class MainActivity extends Activity {
             chip.setGravity(Gravity.CENTER);
             chip.setClickable(true);
             chip.setFocusable(true);
+            chip.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_YES);
             TextView label = text(labels[i], 13, muted, true);
+            label.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
             chip.addView(label);
             TextView badge = text("0", 12, accentText, true);
             badge.setGravity(Gravity.CENTER);
             badge.setPadding(dp(4), 0, dp(4), 0);
-            LinearLayout.LayoutParams badgeParams = new LinearLayout.LayoutParams(dp(36), dp(24));
+            badge.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+            badge.setMinWidth(dp(36));
+            badge.setMinHeight(dp(24));
+            LinearLayout.LayoutParams badgeParams = new LinearLayout.LayoutParams(-2, -2);
             badgeParams.leftMargin = dp(10);
             chip.addView(badge, badgeParams);
             LinearLayout.LayoutParams chipParams = new LinearLayout.LayoutParams(0, -1, 1);
@@ -261,9 +275,10 @@ public class MainActivity extends Activity {
 
         LinearLayout bottomBar = new LinearLayout(this);
         bottomBar.setGravity(Gravity.CENTER_VERTICAL);
+        int bottomHeight = dp(Math.max(52, 28 + 18 * fontScale));
         LinearLayout.LayoutParams bottomParams = landscape
-                ? new LinearLayout.LayoutParams(0, dp(52), 3)
-                : new LinearLayout.LayoutParams(-1, dp(52));
+                ? new LinearLayout.LayoutParams(0, bottomHeight, 3)
+                : new LinearLayout.LayoutParams(-1, bottomHeight);
         controls.addView(bottomBar, bottomParams);
 
         searchView = new EditText(this);
@@ -277,7 +292,7 @@ public class MainActivity extends Activity {
         searchView.setCompoundDrawablePadding(dp(8));
         searchView.setCompoundDrawablesWithIntrinsicBounds(android.R.drawable.ic_menu_search, 0, 0, 0);
         searchView.setCompoundDrawableTintList(ColorStateList.valueOf(muted));
-        bottomBar.addView(searchView, new LinearLayout.LayoutParams(0, dp(52), 1));
+        bottomBar.addView(searchView, new LinearLayout.LayoutParams(0, bottomHeight, 1));
         searchView.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) { }
             @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
@@ -363,7 +378,7 @@ public class MainActivity extends Activity {
         sheetBackground.setColor(surface);
         sheet.setBackground(sheetBackground);
 
-        FrameLayout header = new FrameLayout(this);
+        FrameLayout header = new SheetHeader(dismiss);
         sheet.addView(header, new LinearLayout.LayoutParams(-1, dp(48)));
         View handle = new View(this);
         GradientDrawable handleBackground = new GradientDrawable();
@@ -387,7 +402,7 @@ public class MainActivity extends Activity {
         header.addView(close, closeParams);
         close.setOnClickListener(v -> dismissInfoPage());
 
-        ScrollView scroll = detailScroll(sheet, dismiss);
+        ScrollView scroll = new ScrollView(this);
         scroll.setFillViewport(true);
         scroll.setVerticalScrollBarEnabled(false);
         sheet.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
@@ -399,6 +414,7 @@ public class MainActivity extends Activity {
         ImageView logo = new ImageView(this);
         logo.setImageResource(R.drawable.native_symbols_logo);
         logo.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        logo.setContentDescription("Native Symbols app logo");
         LinearLayout.LayoutParams logoParams = new LinearLayout.LayoutParams(
                 dp(landscape ? 96 : 132), dp(landscape ? 96 : 132));
         logoParams.gravity = Gravity.CENTER_HORIZONTAL;
@@ -408,6 +424,7 @@ public class MainActivity extends Activity {
         byline.setGravity(Gravity.CENTER);
         byline.setClickable(true);
         byline.setFocusable(true);
+        byline.setMinHeight(dp(48));
         byline.setContentDescription("GitHub profile: albertolicea00");
         byline.setOnClickListener(v -> openExternalUrl("https://github.com/albertolicea00"));
         LinearLayout.LayoutParams bylineParams = new LinearLayout.LayoutParams(-1, -2);
@@ -484,12 +501,13 @@ public class MainActivity extends Activity {
     private void addInfoLink(LinearLayout parent, String label, String url) {
         TextView link = text(label, 15, accentText, true);
         link.setPadding(dp(14), dp(10), dp(14), dp(10));
+        link.setMinHeight(dp(48));
         link.setGravity(Gravity.CENTER);
         link.setBackground(shape(surface, line));
         link.setClickable(true);
         link.setFocusable(true);
         link.setContentDescription(label + ", opens in browser");
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(dp(240), dp(48));
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(dp(240), -2);
         params.topMargin = parent.getChildCount() == 0 ? 0 : dp(5);
         parent.addView(link, params);
         link.setOnClickListener(v -> openExternalUrl(url));
@@ -528,6 +546,7 @@ public class MainActivity extends Activity {
         for (int i = 0; i < filterViews.size(); i++) {
             LinearLayout chip = filterViews.get(i);
             boolean selected = i == filter;
+            chip.setSelected(selected);
             filterLabels.get(i).setTextColor(selected ? onPrimary : muted);
             filterCounts.get(i).setTextColor(selected ? primary : accentText);
             filterCounts.get(i).setBackground(shape(selected ? onPrimary : codeBackground,
@@ -572,7 +591,8 @@ public class MainActivity extends Activity {
             columns = Math.max(minimumColumns, Math.min(4, contentWidth / dp(240)));
             resultCellSize = dp(56);
         } else {
-            columns = Math.max(2, Math.min(8, contentWidth / dp(84)));
+            float fontScale = Math.max(1f, getResources().getConfiguration().fontScale);
+            columns = Math.max(2, Math.min(8, contentWidth / dp(84 * fontScale)));
             resultCellSize = (contentWidth - dp(2) * (columns - 1)) / columns;
         }
         results.setNumColumns(columns);
@@ -587,18 +607,22 @@ public class MainActivity extends Activity {
         card.setBackground(shape(surface, line));
         card.setClickable(true);
         card.setFocusable(true);
-        card.setContentDescription(displayName(item.name));
+        card.setContentDescription(displayName(item.name)
+                + (item.material ? ", Material icon" : ", Android system drawable"));
         ImageView image = new ImageView(this);
         image.setImageResource(item.resourceId);
+        image.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
         if (!item.material) image.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
         image.setImageTintList(ColorStateList.valueOf(ink));
         int iconSize = Math.min(dp(44), Math.round(cardSize * 0.42f));
         card.addView(image, new LinearLayout.LayoutParams(iconSize, iconSize));
         TextView name = text(displayName(item.name), 11, iconNameColor, true);
+        name.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
         name.setGravity(Gravity.CENTER);
         name.setMaxLines(2);
         name.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        LinearLayout.LayoutParams nameParams = new LinearLayout.LayoutParams(-1, dp(26));
+        float fontScale = Math.max(1f, getResources().getConfiguration().fontScale);
+        LinearLayout.LayoutParams nameParams = new LinearLayout.LayoutParams(-1, dp(26 * fontScale));
         nameParams.topMargin = dp(3);
         card.addView(name, nameParams);
         card.setOnClickListener(v -> showDetails(item));
@@ -612,13 +636,16 @@ public class MainActivity extends Activity {
         row.setBackground(shape(surface, line));
         row.setClickable(true);
         row.setFocusable(true);
-        row.setContentDescription(displayName(item.name));
+        row.setContentDescription(displayName(item.name)
+                + (item.material ? ", Material icon" : ", Android system drawable"));
         ImageView image = new ImageView(this);
         image.setImageResource(item.resourceId);
+        image.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
         if (!item.material) image.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
         image.setImageTintList(ColorStateList.valueOf(ink));
         row.addView(image, new LinearLayout.LayoutParams(dp(36), dp(36)));
         TextView name = text(displayName(item.name), 15, iconNameColor, true);
+        name.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
         name.setSingleLine(true);
         name.setEllipsize(android.text.TextUtils.TruncateAt.END);
         LinearLayout.LayoutParams nameParams = new LinearLayout.LayoutParams(0, -2, 1);
@@ -645,7 +672,7 @@ public class MainActivity extends Activity {
         sheetBackground.setColor(surface);
         sheet.setBackground(sheetBackground);
 
-        FrameLayout header = new FrameLayout(this);
+        FrameLayout header = new SheetHeader(dismiss);
         sheet.addView(header, new LinearLayout.LayoutParams(-1, dp(48)));
         View handle = new View(this);
         GradientDrawable handleBackground = new GradientDrawable();
@@ -668,7 +695,7 @@ public class MainActivity extends Activity {
         header.addView(close, closeParams);
         close.setOnClickListener(v -> dismissDetails());
 
-        ScrollView scroll = detailScroll(sheet, dismiss);
+        ScrollView scroll = new ScrollView(this);
         scroll.setFillViewport(true);
         scroll.setVerticalScrollBarEnabled(false);
         sheet.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
@@ -740,48 +767,18 @@ public class MainActivity extends Activity {
         }
     }
 
-    private ScrollView detailScroll(View sheet, Runnable dismiss) {
-        return new ScrollView(this) {
-            private float startY;
-            private boolean dragging;
+    private final class SheetHeader extends FrameLayout {
+        SheetHeader(Runnable onClick) {
+            super(MainActivity.this);
+            setClickable(true);
+            setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+            setOnClickListener(v -> onClick.run());
+        }
 
-            @Override public boolean onInterceptTouchEvent(MotionEvent event) {
-                if (event.getActionMasked() == MotionEvent.ACTION_DOWN) {
-                    startY = event.getRawY();
-                    dragging = false;
-                } else if (event.getActionMasked() == MotionEvent.ACTION_MOVE) {
-                    if (getScrollY() > 0) startY = event.getRawY();
-                    else if (event.getRawY() - startY > dp(12)) return true;
-                }
-                return super.onInterceptTouchEvent(event);
-            }
-
-            @Override public boolean onTouchEvent(MotionEvent event) {
-                switch (event.getActionMasked()) {
-                    case MotionEvent.ACTION_DOWN:
-                        startY = event.getRawY();
-                        dragging = false;
-                        break;
-                    case MotionEvent.ACTION_MOVE:
-                        if (getScrollY() > 0 && !dragging) startY = event.getRawY();
-                        else if (event.getRawY() - startY > dp(12)) dragging = true;
-                        if (dragging) {
-                            sheet.setTranslationY(Math.max(0, event.getRawY() - startY));
-                            return true;
-                        }
-                        break;
-                    case MotionEvent.ACTION_UP:
-                    case MotionEvent.ACTION_CANCEL:
-                        if (dragging) {
-                            finishSheetDrag(sheet, dismiss, event);
-                            dragging = false;
-                            return true;
-                        }
-                        break;
-                }
-                return super.onTouchEvent(event);
-            }
-        };
+        @Override public boolean performClick() {
+            super.performClick();
+            return true;
+        }
     }
 
     private View.OnTouchListener sheetDragListener(View sheet, Runnable dismiss) {
@@ -803,11 +800,16 @@ public class MainActivity extends Activity {
                         }
                         return true;
                     case MotionEvent.ACTION_UP:
-                    case MotionEvent.ACTION_CANCEL:
                         if (dragging) {
                             finishSheetDrag(sheet, dismiss, event);
                             dragging = false;
+                        } else {
+                            view.performClick();
                         }
+                        return true;
+                    case MotionEvent.ACTION_CANCEL:
+                        if (dragging) finishSheetDrag(sheet, dismiss, event);
+                        dragging = false;
                         return true;
                     default:
                         return false;
@@ -840,6 +842,11 @@ public class MainActivity extends Activity {
         header.addView(label, new LinearLayout.LayoutParams(0, -2, 1));
         TextView copy = text("COPY", 12, accentText, true);
         copy.setPadding(dp(8), dp(4), dp(2), dp(4));
+        copy.setMinHeight(dp(48));
+        copy.setGravity(Gravity.CENTER_VERTICAL);
+        copy.setFocusable(true);
+        copy.setClickable(true);
+        copy.setContentDescription("Copy " + heading);
         header.addView(copy);
         copy.setOnClickListener(v -> copyText(heading, code));
 
