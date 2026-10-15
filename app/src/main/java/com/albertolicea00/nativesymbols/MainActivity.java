@@ -87,7 +87,7 @@ public class MainActivity extends Activity {
         super.onCreate(state);
         applyPalette();
         getWindow().setStatusBarColor(background);
-        getWindow().setNavigationBarColor(background);
+        getWindow().setNavigationBarColor(surface);
         getWindow().getDecorView().setSystemUiVisibility(darkMode ? 0
                 : View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
         if (state != null) filter = Math.max(0, Math.min(1, state.getInt("filter", 0)));
@@ -162,24 +162,19 @@ public class MainActivity extends Activity {
         filterCounts.clear();
         LinearLayout root = pageRoot();
 
-        TextView eyebrow = text("ANDROID ICON LIBRARY", 11, accentText, true);
-        eyebrow.setLetterSpacing(0.13f);
-        root.addView(eyebrow, new LinearLayout.LayoutParams(-1, dp(36)));
-
-        TextView title = text("Native Symbols", 31, ink, true);
-        LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(-1, -2);
-        titleParams.topMargin = dp(5);
-        root.addView(title, titleParams);
-
-        TextView description = text("Explore icons and copy ready-to-use Android code.", 14, muted, false);
-        LinearLayout.LayoutParams descriptionParams = new LinearLayout.LayoutParams(-1, -2);
-        descriptionParams.topMargin = dp(5);
-        root.addView(description, descriptionParams);
+        ScrollView scroll = new ScrollView(this);
+        scroll.setFillViewport(true);
+        scroll.setClipToPadding(false);
+        scroll.setVerticalScrollBarEnabled(false);
+        root.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
+        results = new LinearLayout(this);
+        results.setOrientation(LinearLayout.VERTICAL);
+        results.setPadding(dp(20), 0, dp(20), 0);
+        scroll.addView(results);
 
         LinearLayout filters = new LinearLayout(this);
         filters.setOrientation(LinearLayout.HORIZONTAL);
         LinearLayout.LayoutParams filtersParams = new LinearLayout.LayoutParams(-1, dp(42));
-        filtersParams.topMargin = dp(24);
         root.addView(filters, filtersParams);
         String[] labels = { "Material", "System" };
         for (int i = 0; i < labels.length; i++) {
@@ -205,21 +200,9 @@ public class MainActivity extends Activity {
         }
         updateFilters();
 
-        ScrollView scroll = new ScrollView(this);
-        scroll.setFillViewport(true);
-        scroll.setClipToPadding(false);
-        scroll.setVerticalScrollBarEnabled(false);
-        root.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
-        results = new LinearLayout(this);
-        results.setOrientation(LinearLayout.VERTICAL);
-        results.setPadding(0, 0, 0, dp(24));
-        scroll.addView(results);
-
         LinearLayout bottomBar = new LinearLayout(this);
         bottomBar.setGravity(Gravity.CENTER_VERTICAL);
         LinearLayout.LayoutParams bottomParams = new LinearLayout.LayoutParams(-1, dp(52));
-        bottomParams.topMargin = dp(8);
-        bottomParams.bottomMargin = dp(8);
         root.addView(bottomBar, bottomParams);
 
         searchView = new EditText(this);
@@ -255,14 +238,13 @@ public class MainActivity extends Activity {
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setBackgroundColor(background);
-        root.setPadding(dp(20), dp(18), dp(20), 0);
         if (Build.VERSION.SDK_INT >= 30) {
             getWindow().setDecorFitsSystemWindows(false);
             root.setOnApplyWindowInsetsListener((view, insets) -> {
                 android.graphics.Insets bars = insets.getInsets(WindowInsets.Type.systemBars());
                 android.graphics.Insets keyboard = insets.getInsets(WindowInsets.Type.ime());
-                view.setPadding(dp(20) + bars.left, dp(18) + bars.top,
-                        dp(20) + bars.right, Math.max(bars.bottom, keyboard.bottom));
+                view.setPadding(bars.left, bars.top, bars.right,
+                        Math.max(bars.bottom, keyboard.bottom));
                 return insets;
             });
         }
