@@ -178,10 +178,18 @@ public class MainActivity extends Activity {
             if (right - left > 0 && right - left != oldRight - oldLeft) renderResults();
         });
 
+        boolean landscape = getResources().getConfiguration().orientation
+                == Configuration.ORIENTATION_LANDSCAPE;
+        LinearLayout controls = new LinearLayout(this);
+        controls.setOrientation(landscape ? LinearLayout.HORIZONTAL : LinearLayout.VERTICAL);
+        root.addView(controls, new LinearLayout.LayoutParams(-1, -2));
+
         LinearLayout filters = new LinearLayout(this);
         filters.setOrientation(LinearLayout.HORIZONTAL);
-        LinearLayout.LayoutParams filtersParams = new LinearLayout.LayoutParams(-1, dp(42));
-        root.addView(filters, filtersParams);
+        LinearLayout.LayoutParams filtersParams = landscape
+                ? new LinearLayout.LayoutParams(0, dp(52), 2)
+                : new LinearLayout.LayoutParams(-1, dp(42));
+        controls.addView(filters, filtersParams);
         String[] labels = { "System", "Material" };
         for (int i = 0; i < labels.length; i++) {
             final int selected = i;
@@ -208,8 +216,10 @@ public class MainActivity extends Activity {
 
         LinearLayout bottomBar = new LinearLayout(this);
         bottomBar.setGravity(Gravity.CENTER_VERTICAL);
-        LinearLayout.LayoutParams bottomParams = new LinearLayout.LayoutParams(-1, dp(52));
-        root.addView(bottomBar, bottomParams);
+        LinearLayout.LayoutParams bottomParams = landscape
+                ? new LinearLayout.LayoutParams(0, dp(52), 3)
+                : new LinearLayout.LayoutParams(-1, dp(52));
+        controls.addView(bottomBar, bottomParams);
 
         searchView = new EditText(this);
         searchView.setSingleLine(true);
