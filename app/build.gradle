@@ -14,3 +14,23 @@ android {
         versionName '1.0'
     }
 }
+
+android.applicationVariants.all { variant ->
+    def channel = variant.name
+    def artifactName = "Native-Symbols-v${variant.versionName}-${channel}-build${variant.versionCode}"
+
+    variant.outputs.all {
+        outputFileName = "${artifactName}.apk"
+    }
+
+    def capitalizedVariant = channel.capitalize()
+    def exportBundle = tasks.register("export${capitalizedVariant}Bundle", Copy) {
+        from(layout.buildDirectory.file("outputs/bundle/${channel}/app-${channel}.aab"))
+        into(layout.buildDirectory.dir("outputs/named"))
+        rename { "${artifactName}.aab" }
+    }
+
+    tasks.named("bundle${capitalizedVariant}") {
+        finalizedBy(exportBundle)
+    }
+}
