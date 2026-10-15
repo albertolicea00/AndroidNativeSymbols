@@ -215,30 +215,10 @@ public class MainActivity extends Activity {
         descriptionParams.topMargin = dp(5);
         root.addView(description, descriptionParams);
 
-        searchView = new EditText(this);
-        searchView.setSingleLine(true);
-        searchView.setTextSize(15);
-        searchView.setTextColor(ink);
-        searchView.setHintTextColor(muted);
-        searchView.setHint("Search Material and System icons");
-        searchView.setBackground(shape(surface, line));
-        searchView.setPadding(dp(16), 0, dp(16), 0);
-        searchView.setCompoundDrawablePadding(dp(8));
-        searchView.setCompoundDrawablesWithIntrinsicBounds(android.R.drawable.ic_menu_search, 0, 0, 0);
-        searchView.setCompoundDrawableTintList(ColorStateList.valueOf(muted));
-        LinearLayout.LayoutParams searchParams = new LinearLayout.LayoutParams(-1, dp(52));
-        searchParams.topMargin = dp(24);
-        root.addView(searchView, searchParams);
-        searchView.addTextChangedListener(new TextWatcher() {
-            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) { }
-            @Override public void onTextChanged(CharSequence s, int start, int before, int count) { renderResults(); }
-            @Override public void afterTextChanged(Editable s) { }
-        });
-
         LinearLayout filters = new LinearLayout(this);
         filters.setOrientation(LinearLayout.HORIZONTAL);
         LinearLayout.LayoutParams filtersParams = new LinearLayout.LayoutParams(-1, dp(42));
-        filtersParams.topMargin = dp(15);
+        filtersParams.topMargin = dp(24);
         root.addView(filters, filtersParams);
         String[] labels = { "Material", "System" };
         for (int i = 0; i < labels.length; i++) {
@@ -267,7 +247,7 @@ public class MainActivity extends Activity {
 
         countView = text("", 13, muted, false);
         LinearLayout.LayoutParams countParams = new LinearLayout.LayoutParams(-1, -2);
-        countParams.topMargin = dp(18);
+        countParams.topMargin = dp(14);
         countParams.bottomMargin = dp(10);
         root.addView(countView, countParams);
 
@@ -280,6 +260,27 @@ public class MainActivity extends Activity {
         results.setOrientation(LinearLayout.VERTICAL);
         results.setPadding(0, 0, 0, dp(24));
         scroll.addView(results);
+
+        searchView = new EditText(this);
+        searchView.setSingleLine(true);
+        searchView.setTextSize(15);
+        searchView.setTextColor(ink);
+        searchView.setHintTextColor(muted);
+        searchView.setHint("Search Material and System icons");
+        searchView.setBackground(shape(surface, line));
+        searchView.setPadding(dp(16), 0, dp(16), 0);
+        searchView.setCompoundDrawablePadding(dp(8));
+        searchView.setCompoundDrawablesWithIntrinsicBounds(android.R.drawable.ic_menu_search, 0, 0, 0);
+        searchView.setCompoundDrawableTintList(ColorStateList.valueOf(muted));
+        LinearLayout.LayoutParams searchParams = new LinearLayout.LayoutParams(-1, dp(52));
+        searchParams.topMargin = dp(8);
+        searchParams.bottomMargin = dp(8);
+        root.addView(searchView, searchParams);
+        searchView.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) { }
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) { renderResults(); }
+            @Override public void afterTextChanged(Editable s) { }
+        });
     }
 
     private void updateFilters() {
