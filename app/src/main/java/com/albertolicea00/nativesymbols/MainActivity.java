@@ -20,7 +20,9 @@ import android.view.View;
 import android.view.Window;
 import android.view.WindowInsets;
 import android.widget.EditText;
+import android.widget.BaseAdapter;
 import android.widget.FrameLayout;
+import android.widget.GridView;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
@@ -59,7 +61,11 @@ public class MainActivity extends Activity {
     private final List<LinearLayout> filterViews = new ArrayList<>();
     private final List<TextView> filterLabels = new ArrayList<>();
     private final List<TextView> filterCounts = new ArrayList<>();
-    private LinearLayout results;
+    private final List<IconItem> visibleItems = new ArrayList<>();
+    private GridView results;
+    private BaseAdapter resultsAdapter;
+    private TextView emptyView;
+    private int resultCellSize;
     private EditText searchView;
     private int filter = 0;
 
@@ -168,15 +174,34 @@ public class MainActivity extends Activity {
         filterCounts.clear();
         LinearLayout root = pageRoot();
 
-        ScrollView scroll = new ScrollView(this);
-        scroll.setFillViewport(true);
-        scroll.setClipToPadding(false);
-        scroll.setVerticalScrollBarEnabled(false);
-        root.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
-        results = new LinearLayout(this);
-        results.setOrientation(LinearLayout.VERTICAL);
+        results = new GridView(this);
+        results.setNumColumns(1);
         results.setPadding(dp(8), 0, dp(8), 0);
-        scroll.addView(results);
+        results.setClipToPadding(false);
+        results.setVerticalScrollBarEnabled(false);
+        results.setHorizontalSpacing(dp(2));
+        results.setVerticalSpacing(dp(2));
+        results.setStretchMode(GridView.STRETCH_COLUMN_WIDTH);
+        resultsAdapter = new BaseAdapter() {
+            @Override public int getCount() { return visibleItems.size(); }
+            @Override public IconItem getItem(int position) { return visibleItems.get(position); }
+            @Override public long getItemId(int position) { return position; }
+            @Override public View getView(int position, View convertView, android.view.ViewGroup parent) {
+                View view = listLayout ? iconListRow(getItem(position))
+                        : iconCard(getItem(position), resultCellSize);
+                view.setLayoutParams(new android.widget.AbsListView.LayoutParams(-1,
+                        listLayout ? dp(56) : resultCellSize));
+                return view;
+            }
+        };
+        results.setAdapter(resultsAdapter);
+        FrameLayout resultsFrame = new FrameLayout(this);
+        root.addView(resultsFrame, new LinearLayout.LayoutParams(-1, 0, 1));
+        resultsFrame.addView(results, new FrameLayout.LayoutParams(-1, -1));
+        emptyView = text("", 15, muted, false);
+        emptyView.setGravity(Gravity.CENTER);
+        resultsFrame.addView(emptyView, new FrameLayout.LayoutParams(-1, -1));
+        results.setEmptyView(emptyView);
         results.addOnLayoutChangeListener((view, left, top, right, bottom,
                                            oldLeft, oldTop, oldRight, oldBottom) -> {
             if (right - left > 0 && right - left != oldRight - oldLeft) renderResults();
@@ -214,7 +239,7 @@ public class MainActivity extends Activity {
             filterViews.add(chip);
             filterLabels.add(label);
             filterCounts.add(badge);
-            chip.setOnClickListener(v -> { filter = selected; updateFilters(); renderResults(); });
+            chip.setOnClickListener(v -> { filter = selected; updateFilters(); renderResults(); results.setSelection(0); });
         }
         updateFilters();
 
@@ -239,7 +264,10 @@ public class MainActivity extends Activity {
         bottomBar.addView(searchView, new LinearLayout.LayoutParams(0, dp(52), 1));
         searchView.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) { }
-            @Override public void onTextChanged(CharSequence s, int start, int before, int count) { renderResults(); }
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
+                renderResults();
+                results.setSelection(0);
+            }
             @Override public void afterTextChanged(Editable s) { }
         });
 
@@ -277,6 +305,7 @@ public class MainActivity extends Activity {
         getSharedPreferences(PREFS, MODE_PRIVATE).edit().putBoolean(LAYOUT_KEY, listLayout).apply();
         updateLayoutButton();
         renderResults();
+        results.setSelection(0);
     }
 
     private void updateLayoutButton() {
@@ -315,54 +344,29 @@ public class MainActivity extends Activity {
         filterCounts.get(1).setText(String.valueOf(materialMatches.size()));
         updateFilters();
         List<IconItem> visible = filter == 0 ? systemMatches : materialMatches;
-        results.removeAllViews();
+        boolean otherHasMatches = filter == 0 ? !materialMatches.isEmpty() : !systemMatches.isEmpty();
+        String otherName = filter == 0 ? "Material" : "System";
+        emptyView.setText(otherHasMatches
+                ? "No icons here. Check " + otherName + "."
+                : "No icons found. Try another name.");
+        visibleItems.clear();
+        visibleItems.addAll(visible);
         int contentWidth = results.getWidth() > 0
                 ? results.getWidth() - results.getPaddingLeft() - results.getPaddingRight()
                 : getResources().getDisplayMetrics().widthPixels
                         - results.getPaddingLeft() - results.getPaddingRight();
+        int columns;
         if (listLayout) {
             int minimumColumns = getResources().getConfiguration().orientation
                     == Configuration.ORIENTATION_LANDSCAPE ? 2 : 1;
-            int columns = Math.max(minimumColumns, Math.min(4, contentWidth / dp(240)));
-            int gap = dp(1);
-            for (int start = 0; start < visible.size(); start += columns) {
-                LinearLayout row = new LinearLayout(this);
-                row.setOrientation(LinearLayout.HORIZONTAL);
-                results.addView(row, new LinearLayout.LayoutParams(-1, dp(56) + 2 * gap));
-                for (int col = 0; col < columns; col++) {
-                    LinearLayout.LayoutParams cellParams = new LinearLayout.LayoutParams(0, dp(56), 1);
-                    cellParams.setMargins(gap, gap, gap, gap);
-                    int index = start + col;
-                    if (index < visible.size()) row.addView(iconListRow(visible.get(index)), cellParams);
-                    else row.addView(new View(this), cellParams);
-                }
-            }
+            columns = Math.max(minimumColumns, Math.min(4, contentWidth / dp(240)));
+            resultCellSize = dp(56);
         } else {
-            int columns = Math.max(2, Math.min(8, contentWidth / dp(84)));
-            int gap = dp(1);
-            int cardSize = contentWidth / columns - 2 * gap;
-            for (int start = 0; start < visible.size(); start += columns) {
-                LinearLayout row = new LinearLayout(this);
-                row.setOrientation(LinearLayout.HORIZONTAL);
-                results.addView(row, new LinearLayout.LayoutParams(-1, cardSize + 2 * gap));
-                for (int col = 0; col < columns; col++) {
-                    LinearLayout.LayoutParams cellParams = new LinearLayout.LayoutParams(0, cardSize, 1);
-                    cellParams.setMargins(gap, gap, gap, gap);
-                    int index = start + col;
-                    if (index < visible.size()) row.addView(iconCard(visible.get(index), cardSize), cellParams);
-                    else row.addView(new View(this), cellParams);
-                }
-            }
+            columns = Math.max(2, Math.min(8, contentWidth / dp(84)));
+            resultCellSize = (contentWidth - dp(2) * (columns - 1)) / columns;
         }
-        if (visible.isEmpty()) {
-            boolean otherHasMatches = filter == 0 ? !materialMatches.isEmpty() : !systemMatches.isEmpty();
-            String otherName = filter == 0 ? "Material" : "System";
-            TextView empty = text(otherHasMatches
-                    ? "No icons here. Check " + otherName + "."
-                    : "No icons found. Try another name.", 15, muted, false);
-            empty.setGravity(Gravity.CENTER);
-            results.addView(empty, new LinearLayout.LayoutParams(-1, dp(180)));
-        }
+        results.setNumColumns(columns);
+        resultsAdapter.notifyDataSetChanged();
     }
 
     private View iconCard(IconItem item, int cardSize) {
@@ -419,20 +423,17 @@ public class MainActivity extends Activity {
         sheet.setOrientation(LinearLayout.VERTICAL);
         GradientDrawable sheetBackground = new GradientDrawable();
         sheetBackground.setColor(surface);
-        float radius = dp(20);
-        sheetBackground.setCornerRadii(new float[] { radius, radius, radius, radius, 0, 0, 0, 0 });
         sheet.setBackground(sheetBackground);
-        sheet.setClipToOutline(true);
 
         FrameLayout header = new FrameLayout(this);
-        sheet.addView(header, new LinearLayout.LayoutParams(-1, dp(56)));
+        sheet.addView(header, new LinearLayout.LayoutParams(-1, dp(48)));
         View handle = new View(this);
         GradientDrawable handleBackground = new GradientDrawable();
         handleBackground.setColor(muted);
         handleBackground.setCornerRadius(dp(2));
         handle.setBackground(handleBackground);
         FrameLayout.LayoutParams handleParams = new FrameLayout.LayoutParams(dp(36), dp(4), Gravity.TOP | Gravity.CENTER_HORIZONTAL);
-        handleParams.topMargin = dp(12);
+        handleParams.topMargin = dp(8);
         header.addView(handle, handleParams);
 
         ImageView close = new ImageView(this);
@@ -444,7 +445,6 @@ public class MainActivity extends Activity {
         close.setFocusable(true);
         FrameLayout.LayoutParams closeParams = new FrameLayout.LayoutParams(dp(48), dp(48), Gravity.TOP | Gravity.END);
         closeParams.rightMargin = dp(8);
-        closeParams.topMargin = dp(4);
         header.addView(close, closeParams);
         close.setOnClickListener(v -> dialog.dismiss());
 
@@ -454,7 +454,7 @@ public class MainActivity extends Activity {
         sheet.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
         LinearLayout content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
-        content.setPadding(dp(20), dp(8), dp(20), dp(24));
+        content.setPadding(dp(20), 0, dp(20), dp(24));
         content.setBackgroundColor(surface);
         scroll.addView(content);
 
@@ -468,7 +468,7 @@ public class MainActivity extends Activity {
         TextView title = text(displayName(item.name), 22, ink, true);
         title.setGravity(Gravity.CENTER);
         LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(-1, -2);
-        titleParams.topMargin = dp(12);
+        titleParams.topMargin = dp(8);
         content.addView(title, titleParams);
 
         TextView kind = text(item.material ? "LOCAL MATERIAL VECTOR" : "ANDROID SYSTEM DRAWABLE", 11, accentText, true);
@@ -481,11 +481,11 @@ public class MainActivity extends Activity {
         TextView note = text(item.material
                 ? "Add this vector XML to res/drawable before using the snippets below."
                 : "This drawable is supplied by Android. Its appearance may vary across devices.",
-                13, muted, false);
+                item.material ? 13 : 9, item.material ? muted : ink, false);
         note.setGravity(Gravity.CENTER);
         LinearLayout.LayoutParams noteParams = new LinearLayout.LayoutParams(-1, -2);
         noteParams.topMargin = dp(13);
-        content.addView(note, noteParams);
+        if (item.material) content.addView(note, noteParams);
 
         addCodeBlock(content, "XML layout", "<ImageView\n    android:layout_width=\"24dp\"\n"
                 + "    android:layout_height=\"24dp\"\n"
@@ -497,6 +497,8 @@ public class MainActivity extends Activity {
             try {
                 addCodeBlock(content, "Vector drawable XML", readAsset("vectors/" + item.name + ".xml"));
             } catch (Exception ignored) { }
+        } else {
+            content.addView(note, noteParams);
         }
 
         header.setOnTouchListener(sheetDragListener(sheet, dialog));
