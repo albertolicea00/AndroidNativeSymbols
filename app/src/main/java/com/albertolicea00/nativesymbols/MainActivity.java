@@ -50,7 +50,9 @@ public class MainActivity extends Activity {
     private String themeMode;
 
     private final List<IconItem> items = new ArrayList<>();
-    private final List<TextView> filterViews = new ArrayList<>();
+    private final List<LinearLayout> filterViews = new ArrayList<>();
+    private final List<TextView> filterLabels = new ArrayList<>();
+    private final List<TextView> filterCounts = new ArrayList<>();
     private LinearLayout results;
     private TextView countView;
     private EditText searchView;
@@ -89,7 +91,7 @@ public class MainActivity extends Activity {
         getWindow().setNavigationBarColor(background);
         getWindow().getDecorView().setSystemUiVisibility(darkMode ? 0
                 : View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
-        if (state != null) filter = state.getInt("filter", 0);
+        if (state != null) filter = Math.max(0, Math.min(1, state.getInt("filter", 0)));
         loadIcons();
         buildScreen();
         if (state != null) searchView.setText(state.getString("query", ""));
@@ -198,7 +200,7 @@ public class MainActivity extends Activity {
         TextView appearance = text("THEME: " + modeLabel, 11, accentText, true);
         appearance.setGravity(Gravity.CENTER);
         appearance.setPadding(dp(10), dp(7), dp(10), dp(7));
-        appearance.setBackground(shape(surface, line, 10));
+        appearance.setBackground(shape(surface, line));
         appearance.setContentDescription("Choose appearance, current setting " + modeLabel);
         appearance.setOnClickListener(v -> showAppearanceDialog());
         topRow.addView(appearance);
@@ -218,8 +220,8 @@ public class MainActivity extends Activity {
         searchView.setTextSize(15);
         searchView.setTextColor(ink);
         searchView.setHintTextColor(muted);
-        searchView.setHint("Search icons by name");
-        searchView.setBackground(shape(surface, line, 14));
+        searchView.setHint("Search Material and System icons");
+        searchView.setBackground(shape(surface, line));
         searchView.setPadding(dp(16), 0, dp(16), 0);
         searchView.setCompoundDrawablePadding(dp(8));
         searchView.setCompoundDrawablesWithIntrinsicBounds(android.R.drawable.ic_menu_search, 0, 0, 0);
@@ -238,16 +240,28 @@ public class MainActivity extends Activity {
         LinearLayout.LayoutParams filtersParams = new LinearLayout.LayoutParams(-1, dp(42));
         filtersParams.topMargin = dp(15);
         root.addView(filters, filtersParams);
-        String[] labels = { "All", "Material", "System" };
+        String[] labels = { "Material", "System" };
         for (int i = 0; i < labels.length; i++) {
             final int selected = i;
-            TextView chip = text(labels[i], 13, muted, true);
+            LinearLayout chip = new LinearLayout(this);
             chip.setGravity(Gravity.CENTER);
+            chip.setClickable(true);
+            chip.setFocusable(true);
+            TextView label = text(labels[i], 13, muted, true);
+            chip.addView(label);
+            TextView badge = text("0", 12, accentText, true);
+            badge.setGravity(Gravity.CENTER);
+            badge.setPadding(dp(4), 0, dp(4), 0);
+            LinearLayout.LayoutParams badgeParams = new LinearLayout.LayoutParams(dp(36), dp(24));
+            badgeParams.leftMargin = dp(10);
+            chip.addView(badge, badgeParams);
             LinearLayout.LayoutParams chipParams = new LinearLayout.LayoutParams(0, -1, 1);
             if (i > 0) chipParams.leftMargin = dp(8);
             filters.addView(chip, chipParams);
             filterViews.add(chip);
-            chip.setOnClickListener(v -> { filter = selected; updateFilters(); renderResults(); });
+            filterLabels.add(label);
+            filterCounts.add(badge);
+            chip.setOnClickListener(v -> { filter = selected; renderResults(); });
         }
         updateFilters();
 
@@ -270,36 +284,46 @@ public class MainActivity extends Activity {
 
     private void updateFilters() {
         for (int i = 0; i < filterViews.size(); i++) {
-            TextView chip = filterViews.get(i);
+            LinearLayout chip = filterViews.get(i);
             boolean selected = i == filter;
-            chip.setTextColor(selected ? onPrimary : muted);
-            chip.setBackground(shape(selected ? primary : surface, selected ? primary : line, 12));
+            filterLabels.get(i).setTextColor(selected ? onPrimary : muted);
+            filterCounts.get(i).setTextColor(selected ? primary : accentText);
+            filterCounts.get(i).setBackground(shape(selected ? onPrimary : codeBackground,
+                    selected ? onPrimary : line));
+            chip.setBackground(shape(selected ? primary : surface, selected ? primary : line));
+            String matches = filterCounts.get(i).getText().toString();
+            chip.setContentDescription((i == 0 ? "Material" : "System") + ", "
+                    + matches + ("1".equals(matches) ? " match" : " matches")
+                    + (selected ? ", selected" : ""));
         }
     }
 
     private void renderResults() {
         if (results == null || searchView == null) return;
         String query = searchView.getText().toString().trim().toLowerCase(Locale.ROOT);
-        List<IconItem> visible = new ArrayList<>();
+        List<IconItem> materialMatches = new ArrayList<>();
+        List<IconItem> systemMatches = new ArrayList<>();
         for (IconItem item : items) {
-            if (filter == 1 && !item.material) continue;
-            if (filter == 2 && item.material) continue;
             if (!item.name.toLowerCase(Locale.ROOT).contains(query)
                     && !displayName(item.name).toLowerCase(Locale.ROOT).contains(query)) continue;
-            visible.add(item);
+            (item.material ? materialMatches : systemMatches).add(item);
         }
+        filterCounts.get(0).setText(String.valueOf(materialMatches.size()));
+        filterCounts.get(1).setText(String.valueOf(systemMatches.size()));
+        updateFilters();
+        List<IconItem> visible = filter == 0 ? materialMatches : systemMatches;
         String count = visible.size() + (visible.size() == 1 ? " icon" : " icons");
-        countView.setText(count + (filter == 1 ? " bundled with this app"
-                : filter == 2 ? " available on this device" : " to explore"));
+        countView.setText(count + (filter == 0 ? " bundled with this app"
+                : " available on this device"));
         results.removeAllViews();
         int width = getResources().getDisplayMetrics().widthPixels;
         int columns = width >= dp(600) ? 5 : 3;
         for (int start = 0; start < visible.size(); start += columns) {
             LinearLayout row = new LinearLayout(this);
             row.setOrientation(LinearLayout.HORIZONTAL);
-            results.addView(row, new LinearLayout.LayoutParams(-1, dp(122)));
+            results.addView(row, new LinearLayout.LayoutParams(-1, dp(108)));
             for (int col = 0; col < columns; col++) {
-                LinearLayout.LayoutParams cellParams = new LinearLayout.LayoutParams(0, dp(114), 1);
+                LinearLayout.LayoutParams cellParams = new LinearLayout.LayoutParams(0, dp(100), 1);
                 cellParams.setMargins(dp(3), dp(3), dp(3), dp(3));
                 int index = start + col;
                 if (index < visible.size()) row.addView(iconCard(visible.get(index)), cellParams);
@@ -307,7 +331,11 @@ public class MainActivity extends Activity {
             }
         }
         if (visible.isEmpty()) {
-            TextView empty = text("No icons found. Try another name.", 15, muted, false);
+            int otherCount = filter == 0 ? systemMatches.size() : materialMatches.size();
+            String otherName = filter == 0 ? "System" : "Material";
+            TextView empty = text(otherCount > 0
+                    ? "No icons here. Check " + otherName + " (" + otherCount + ")."
+                    : "No icons found. Try another name.", 15, muted, false);
             empty.setGravity(Gravity.CENTER);
             results.addView(empty, new LinearLayout.LayoutParams(-1, dp(180)));
         }
@@ -317,11 +345,11 @@ public class MainActivity extends Activity {
         LinearLayout card = new LinearLayout(this);
         card.setOrientation(LinearLayout.VERTICAL);
         card.setGravity(Gravity.CENTER);
-        card.setPadding(dp(5), dp(10), dp(5), dp(7));
-        card.setBackground(shape(surface, line, 15));
+        card.setPadding(dp(5), dp(8), dp(5), dp(8));
+        card.setBackground(shape(surface, line));
         card.setClickable(true);
         card.setFocusable(true);
-        card.setContentDescription(displayName(item.name) + ", " + (item.material ? "Material" : "System"));
+        card.setContentDescription(displayName(item.name));
         ImageView image = new ImageView(this);
         image.setImageResource(item.resourceId);
         image.setImageTintList(ColorStateList.valueOf(ink));
@@ -331,11 +359,8 @@ public class MainActivity extends Activity {
         name.setMaxLines(2);
         name.setEllipsize(android.text.TextUtils.TruncateAt.END);
         LinearLayout.LayoutParams nameParams = new LinearLayout.LayoutParams(-1, dp(34));
-        nameParams.topMargin = dp(10);
+        nameParams.topMargin = dp(8);
         card.addView(name, nameParams);
-        TextView source = text(item.material ? "MATERIAL" : "SYSTEM", 9, item.material ? accentText : muted, true);
-        source.setLetterSpacing(0.08f);
-        card.addView(source);
         card.setOnClickListener(v -> showDetails(item));
         return card;
     }
@@ -403,7 +428,7 @@ public class MainActivity extends Activity {
         LinearLayout block = new LinearLayout(this);
         block.setOrientation(LinearLayout.VERTICAL);
         block.setPadding(dp(14), dp(12), dp(14), dp(12));
-        block.setBackground(shape(codeBackground, line, 12));
+        block.setBackground(shape(codeBackground, line));
         LinearLayout.LayoutParams blockParams = new LinearLayout.LayoutParams(-1, -2);
         blockParams.topMargin = dp(14);
         parent.addView(block, blockParams);
@@ -463,10 +488,10 @@ public class MainActivity extends Activity {
         return view;
     }
 
-    private GradientDrawable shape(int fill, int stroke, int radius) {
+    private GradientDrawable shape(int fill, int stroke) {
         GradientDrawable drawable = new GradientDrawable();
         drawable.setColor(fill);
-        drawable.setCornerRadius(dp(radius));
+        drawable.setCornerRadius(0);
         drawable.setStroke(dp(1), stroke);
         return drawable;
     }
