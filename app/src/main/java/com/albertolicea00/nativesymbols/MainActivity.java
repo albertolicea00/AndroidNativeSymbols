@@ -171,12 +171,16 @@ public class MainActivity extends Activity {
         results.setOrientation(LinearLayout.VERTICAL);
         results.setPadding(dp(20), 0, dp(20), 0);
         scroll.addView(results);
+        results.addOnLayoutChangeListener((view, left, top, right, bottom,
+                                           oldLeft, oldTop, oldRight, oldBottom) -> {
+            if (right - left > 0 && right - left != oldRight - oldLeft) renderResults();
+        });
 
         LinearLayout filters = new LinearLayout(this);
         filters.setOrientation(LinearLayout.HORIZONTAL);
         LinearLayout.LayoutParams filtersParams = new LinearLayout.LayoutParams(-1, dp(42));
         root.addView(filters, filtersParams);
-        String[] labels = { "Material", "System" };
+        String[] labels = { "System", "Material" };
         for (int i = 0; i < labels.length; i++) {
             final int selected = i;
             LinearLayout chip = new LinearLayout(this);
@@ -275,7 +279,7 @@ public class MainActivity extends Activity {
                     selected ? onPrimary : line));
             chip.setBackground(shape(selected ? primary : surface, selected ? primary : line));
             String matches = filterCounts.get(i).getText().toString();
-            chip.setContentDescription((i == 0 ? "Material" : "System") + ", "
+            chip.setContentDescription((i == 0 ? "System" : "Material") + ", "
                     + matches + ("1".equals(matches) ? " match" : " matches")
                     + (selected ? ", selected" : ""));
         }
@@ -291,10 +295,10 @@ public class MainActivity extends Activity {
                     && !displayName(item.name).toLowerCase(Locale.ROOT).contains(query)) continue;
             (item.material ? materialMatches : systemMatches).add(item);
         }
-        filterCounts.get(0).setText(String.valueOf(materialMatches.size()));
-        filterCounts.get(1).setText(String.valueOf(systemMatches.size()));
+        filterCounts.get(0).setText(String.valueOf(systemMatches.size()));
+        filterCounts.get(1).setText(String.valueOf(materialMatches.size()));
         updateFilters();
-        List<IconItem> visible = filter == 0 ? materialMatches : systemMatches;
+        List<IconItem> visible = filter == 0 ? systemMatches : materialMatches;
         results.removeAllViews();
         if (listLayout) {
             for (IconItem item : visible) {
@@ -303,14 +307,17 @@ public class MainActivity extends Activity {
                 results.addView(iconListRow(item), rowParams);
             }
         } else {
-            int width = getResources().getDisplayMetrics().widthPixels;
-            int columns = width >= dp(600) ? 5 : 3;
+            int contentWidth = results.getWidth() > 0
+                    ? results.getWidth() - results.getPaddingLeft() - results.getPaddingRight()
+                    : getResources().getDisplayMetrics().widthPixels - dp(40);
+            int columns = Math.max(2, Math.min(8, contentWidth / dp(80)));
+            int cardSize = contentWidth / columns - dp(6);
             for (int start = 0; start < visible.size(); start += columns) {
                 LinearLayout row = new LinearLayout(this);
                 row.setOrientation(LinearLayout.HORIZONTAL);
-                results.addView(row, new LinearLayout.LayoutParams(-1, dp(108)));
+                results.addView(row, new LinearLayout.LayoutParams(-1, cardSize + dp(6)));
                 for (int col = 0; col < columns; col++) {
-                    LinearLayout.LayoutParams cellParams = new LinearLayout.LayoutParams(0, dp(100), 1);
+                    LinearLayout.LayoutParams cellParams = new LinearLayout.LayoutParams(0, cardSize, 1);
                     cellParams.setMargins(dp(3), dp(3), dp(3), dp(3));
                     int index = start + col;
                     if (index < visible.size()) row.addView(iconCard(visible.get(index)), cellParams);
@@ -319,8 +326,8 @@ public class MainActivity extends Activity {
             }
         }
         if (visible.isEmpty()) {
-            boolean otherHasMatches = filter == 0 ? !systemMatches.isEmpty() : !materialMatches.isEmpty();
-            String otherName = filter == 0 ? "System" : "Material";
+            boolean otherHasMatches = filter == 0 ? !materialMatches.isEmpty() : !systemMatches.isEmpty();
+            String otherName = filter == 0 ? "Material" : "System";
             TextView empty = text(otherHasMatches
                     ? "No icons here. Check " + otherName + "."
                     : "No icons found. Try another name.", 15, muted, false);
@@ -333,7 +340,7 @@ public class MainActivity extends Activity {
         LinearLayout card = new LinearLayout(this);
         card.setOrientation(LinearLayout.VERTICAL);
         card.setGravity(Gravity.CENTER);
-        card.setPadding(dp(5), dp(8), dp(5), dp(8));
+        card.setPadding(dp(3), dp(4), dp(3), dp(4));
         card.setBackground(shape(surface, line));
         card.setClickable(true);
         card.setFocusable(true);
@@ -341,13 +348,13 @@ public class MainActivity extends Activity {
         ImageView image = new ImageView(this);
         image.setImageResource(item.resourceId);
         image.setImageTintList(ColorStateList.valueOf(ink));
-        card.addView(image, new LinearLayout.LayoutParams(dp(32), dp(32)));
-        TextView name = text(displayName(item.name), 11, ink, true);
+        card.addView(image, new LinearLayout.LayoutParams(dp(24), dp(24)));
+        TextView name = text(displayName(item.name), 10, ink, true);
         name.setGravity(Gravity.CENTER);
         name.setMaxLines(2);
         name.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        LinearLayout.LayoutParams nameParams = new LinearLayout.LayoutParams(-1, dp(34));
-        nameParams.topMargin = dp(8);
+        LinearLayout.LayoutParams nameParams = new LinearLayout.LayoutParams(-1, dp(26));
+        nameParams.topMargin = dp(3);
         card.addView(name, nameParams);
         card.setOnClickListener(v -> showDetails(item));
         return card;

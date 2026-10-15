@@ -25,7 +25,7 @@ A small, fully native Android app for exploring icons and copying the code neede
 
 ## ✨ What you can do
 
-- 🧭 Browse **Material** and **System** icons in a grid or list.
+- 🧭 Browse **System** and **Material** icons in a grid or list.
 - 🔎 Search both catalogs by icon name and preview each drawable.
 - 📋 Copy ready-to-use XML layout, Kotlin, and Java snippets.
 - 🧩 Copy the complete vector XML for a bundled Material icon.
