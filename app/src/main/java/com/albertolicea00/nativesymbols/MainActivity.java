@@ -36,6 +36,18 @@ import java.util.Locale;
 public class MainActivity extends Activity {
     private static final String PREFS = "appearance";
     private static final String THEME_KEY = "theme_mode";
+    private static final String COLOR_KEY = "app_color";
+    private static final String LAYOUT_KEY = "icon_layout";
+    private static final int PAGE_CATALOG = 0;
+    private static final int PAGE_SETTINGS = 1;
+    private static final int PAGE_APPEARANCE = 2;
+    private static final int PAGE_COLOR = 3;
+    private static final int PAGE_LAYOUT = 4;
+    private static final String[] COLOR_NAMES = { "Green", "Blue", "Purple", "Orange" };
+    private static final int[] PRIMARY_COLORS = { 0xFF34A853, 0xFF1A73E8, 0xFF9334E6, 0xFFF9AB00 };
+    private static final int[] ON_PRIMARY_COLORS = { 0xFF0B2D16, 0xFFFFFFFF, 0xFFFFFFFF, 0xFF3A2500 };
+    private static final int[] ACCENT_LIGHT_COLORS = { 0xFF176D39, 0xFF1558B0, 0xFF6F2DA8, 0xFF9C5200 };
+    private static final int[] ACCENT_DARK_COLORS = { 0xFF86DFA0, 0xFF8AB4F8, 0xFFD8B4FE, 0xFFFFC978 };
 
     private int ink;
     private int muted;
@@ -48,15 +60,18 @@ public class MainActivity extends Activity {
     private int codeBackground;
     private boolean darkMode;
     private String themeMode;
+    private int colorIndex;
+    private boolean listLayout;
 
     private final List<IconItem> items = new ArrayList<>();
     private final List<LinearLayout> filterViews = new ArrayList<>();
     private final List<TextView> filterLabels = new ArrayList<>();
     private final List<TextView> filterCounts = new ArrayList<>();
     private LinearLayout results;
-    private TextView countView;
     private EditText searchView;
     private int filter = 0;
+    private int page = PAGE_CATALOG;
+    private String query = "";
 
     private static final class IconItem {
         final String name;
@@ -81,6 +96,9 @@ public class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle state) {
         themeMode = getSharedPreferences(PREFS, MODE_PRIVATE).getString(THEME_KEY, "system");
+        colorIndex = Math.max(0, Math.min(COLOR_NAMES.length - 1,
+                getSharedPreferences(PREFS, MODE_PRIVATE).getInt(COLOR_KEY, 0)));
+        listLayout = getSharedPreferences(PREFS, MODE_PRIVATE).getBoolean(LAYOUT_KEY, false);
         boolean systemDark = (getResources().getConfiguration().uiMode
                 & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
         darkMode = "dark".equals(themeMode) || ("system".equals(themeMode) && systemDark);
@@ -91,24 +109,36 @@ public class MainActivity extends Activity {
         getWindow().setNavigationBarColor(background);
         getWindow().getDecorView().setSystemUiVisibility(darkMode ? 0
                 : View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
-        if (state != null) filter = Math.max(0, Math.min(1, state.getInt("filter", 0)));
+        if (state != null) {
+            filter = Math.max(0, Math.min(1, state.getInt("filter", 0)));
+            page = Math.max(PAGE_CATALOG, Math.min(PAGE_LAYOUT, state.getInt("page", PAGE_CATALOG)));
+            query = state.getString("query", "");
+        }
         loadIcons();
-        buildScreen();
-        if (state != null) searchView.setText(state.getString("query", ""));
-        renderResults();
+        if (page == PAGE_CATALOG) buildScreen();
+        else buildSettingsPage();
     }
 
     @Override
     protected void onSaveInstanceState(Bundle outState) {
         outState.putInt("filter", filter);
-        if (searchView != null) outState.putString("query", searchView.getText().toString());
+        outState.putInt("page", page);
+        outState.putString("query", page == PAGE_CATALOG && searchView != null
+                ? searchView.getText().toString() : query);
         super.onSaveInstanceState(outState);
     }
 
+    @Override
+    public void onBackPressed() {
+        if (page >= PAGE_APPEARANCE) showPage(PAGE_SETTINGS);
+        else if (page == PAGE_SETTINGS) showPage(PAGE_CATALOG);
+        else super.onBackPressed();
+    }
+
     private void applyPalette() {
-        primary = getColor(R.color.primary);
-        onPrimary = getColor(R.color.on_primary);
-        accentText = getColor(darkMode ? R.color.accent_dark : R.color.accent_light);
+        primary = PRIMARY_COLORS[colorIndex];
+        onPrimary = ON_PRIMARY_COLORS[colorIndex];
+        accentText = darkMode ? ACCENT_DARK_COLORS[colorIndex] : ACCENT_LIGHT_COLORS[colorIndex];
         background = getColor(darkMode ? R.color.background_dark : R.color.background_light);
         surface = getColor(darkMode ? R.color.surface_dark : R.color.surface_light);
         codeBackground = getColor(darkMode ? R.color.code_dark : R.color.code_light);
@@ -117,24 +147,11 @@ public class MainActivity extends Activity {
         line = getColor(darkMode ? R.color.line_dark : R.color.line_light);
     }
 
-    private void showAppearanceDialog() {
-        String[] choices = { "Use device setting", "Light", "Dark" };
-        String[] modes = { "system", "light", "dark" };
-        int selected = "light".equals(themeMode) ? 1 : "dark".equals(themeMode) ? 2 : 0;
-        AlertDialog dialog = new AlertDialog.Builder(this)
-                .setTitle("Appearance")
-                .setSingleChoiceItems(choices, selected, (selectedDialog, which) -> {
-                    selectedDialog.dismiss();
-                    if (!modes[which].equals(themeMode)) {
-                        getSharedPreferences(PREFS, MODE_PRIVATE).edit()
-                                .putString(THEME_KEY, modes[which]).apply();
-                        recreate();
-                    }
-                })
-                .setNegativeButton("Cancel", null)
-                .create();
-        dialog.show();
-        dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setTextColor(accentText);
+    private void styleDialog(AlertDialog dialog) {
+        if (dialog.getWindow() != null) dialog.getWindow().setBackgroundDrawable(shape(surface, line));
+        if (dialog.getButton(AlertDialog.BUTTON_NEGATIVE) != null) {
+            dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setTextColor(accentText);
+        }
     }
 
     private void loadIcons() {
@@ -171,39 +188,14 @@ public class MainActivity extends Activity {
     }
 
     private void buildScreen() {
-        LinearLayout root = new LinearLayout(this);
-        root.setOrientation(LinearLayout.VERTICAL);
-        root.setBackgroundColor(background);
-        root.setPadding(dp(20), dp(18), dp(20), 0);
-        if (Build.VERSION.SDK_INT >= 30) {
-            getWindow().setDecorFitsSystemWindows(false);
-            root.setOnApplyWindowInsetsListener((view, insets) -> {
-                android.graphics.Insets bars = insets.getInsets(WindowInsets.Type.systemBars());
-                android.graphics.Insets keyboard = insets.getInsets(WindowInsets.Type.ime());
-                view.setPadding(dp(20) + bars.left, dp(18) + bars.top,
-                        dp(20) + bars.right, Math.max(bars.bottom, keyboard.bottom));
-                return insets;
-            });
-        }
-        setContentView(root);
-
-        LinearLayout topRow = new LinearLayout(this);
-        topRow.setGravity(Gravity.CENTER_VERTICAL);
-        root.addView(topRow, new LinearLayout.LayoutParams(-1, dp(36)));
+        filterViews.clear();
+        filterLabels.clear();
+        filterCounts.clear();
+        LinearLayout root = pageRoot();
 
         TextView eyebrow = text("ANDROID ICON LIBRARY", 11, accentText, true);
         eyebrow.setLetterSpacing(0.13f);
-        topRow.addView(eyebrow, new LinearLayout.LayoutParams(0, -2, 1));
-
-        String modeLabel = "dark".equals(themeMode) ? "DARK"
-                : "light".equals(themeMode) ? "LIGHT" : "SYSTEM";
-        TextView appearance = text("THEME: " + modeLabel, 11, accentText, true);
-        appearance.setGravity(Gravity.CENTER);
-        appearance.setPadding(dp(10), dp(7), dp(10), dp(7));
-        appearance.setBackground(shape(surface, line));
-        appearance.setContentDescription("Choose appearance, current setting " + modeLabel);
-        appearance.setOnClickListener(v -> showAppearanceDialog());
-        topRow.addView(appearance);
+        root.addView(eyebrow, new LinearLayout.LayoutParams(-1, dp(36)));
 
         TextView title = text("Native Symbols", 31, ink, true);
         LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(-1, -2);
@@ -236,20 +228,25 @@ public class MainActivity extends Activity {
             badgeParams.leftMargin = dp(10);
             chip.addView(badge, badgeParams);
             LinearLayout.LayoutParams chipParams = new LinearLayout.LayoutParams(0, -1, 1);
-            if (i > 0) chipParams.leftMargin = dp(8);
             filters.addView(chip, chipParams);
             filterViews.add(chip);
             filterLabels.add(label);
             filterCounts.add(badge);
-            chip.setOnClickListener(v -> { filter = selected; renderResults(); });
+            chip.setOnClickListener(v -> { filter = selected; updateFilters(); renderResults(); });
         }
+        ImageView settings = new ImageView(this);
+        settings.setImageResource(R.drawable.ic_md_settings);
+        settings.setImageTintList(ColorStateList.valueOf(accentText));
+        settings.setPadding(dp(10), dp(10), dp(10), dp(10));
+        settings.setBackground(shape(surface, line));
+        settings.setContentDescription("Settings");
+        settings.setClickable(true);
+        settings.setFocusable(true);
+        LinearLayout.LayoutParams settingsParams = new LinearLayout.LayoutParams(dp(42), dp(42));
+        settingsParams.leftMargin = dp(8);
+        filters.addView(settings, settingsParams);
+        settings.setOnClickListener(v -> showPage(PAGE_SETTINGS));
         updateFilters();
-
-        countView = text("", 13, muted, false);
-        LinearLayout.LayoutParams countParams = new LinearLayout.LayoutParams(-1, -2);
-        countParams.topMargin = dp(14);
-        countParams.bottomMargin = dp(10);
-        root.addView(countView, countParams);
 
         ScrollView scroll = new ScrollView(this);
         scroll.setFillViewport(true);
@@ -281,6 +278,183 @@ public class MainActivity extends Activity {
             @Override public void onTextChanged(CharSequence s, int start, int before, int count) { renderResults(); }
             @Override public void afterTextChanged(Editable s) { }
         });
+        searchView.setText(query);
+        renderResults();
+    }
+
+    private LinearLayout pageRoot() {
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setBackgroundColor(background);
+        root.setPadding(dp(20), dp(18), dp(20), 0);
+        if (Build.VERSION.SDK_INT >= 30) {
+            getWindow().setDecorFitsSystemWindows(false);
+            root.setOnApplyWindowInsetsListener((view, insets) -> {
+                android.graphics.Insets bars = insets.getInsets(WindowInsets.Type.systemBars());
+                android.graphics.Insets keyboard = insets.getInsets(WindowInsets.Type.ime());
+                view.setPadding(dp(20) + bars.left, dp(18) + bars.top,
+                        dp(20) + bars.right, Math.max(bars.bottom, keyboard.bottom));
+                return insets;
+            });
+        }
+        setContentView(root);
+        return root;
+    }
+
+    private void showPage(int nextPage) {
+        if (page == PAGE_CATALOG && searchView != null) {
+            query = searchView.getText().toString();
+            searchView.clearFocus();
+        }
+        page = nextPage;
+        if (page == PAGE_CATALOG) buildScreen();
+        else buildSettingsPage();
+    }
+
+    private void buildSettingsPage() {
+        LinearLayout root = pageRoot();
+        String title = page == PAGE_SETTINGS ? "Settings"
+                : page == PAGE_APPEARANCE ? "Appearance"
+                : page == PAGE_COLOR ? "App color" : "Icon layout";
+
+        LinearLayout header = new LinearLayout(this);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+        root.addView(header, new LinearLayout.LayoutParams(-1, dp(56)));
+        ImageView back = new ImageView(this);
+        back.setImageResource(R.drawable.ic_md_arrow_back);
+        back.setImageTintList(ColorStateList.valueOf(ink));
+        back.setPadding(dp(10), dp(10), dp(10), dp(10));
+        back.setBackground(shape(surface, line));
+        back.setContentDescription("Back");
+        back.setClickable(true);
+        back.setFocusable(true);
+        header.addView(back, new LinearLayout.LayoutParams(dp(42), dp(42)));
+        back.setOnClickListener(v -> showPage(page == PAGE_SETTINGS ? PAGE_CATALOG : PAGE_SETTINGS));
+
+        TextView heading = text(title, 27, ink, true);
+        LinearLayout.LayoutParams headingParams = new LinearLayout.LayoutParams(-1, -2);
+        headingParams.leftMargin = dp(14);
+        header.addView(heading, headingParams);
+
+        ScrollView scroll = new ScrollView(this);
+        scroll.setFillViewport(true);
+        scroll.setVerticalScrollBarEnabled(false);
+        root.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setPadding(0, dp(14), 0, dp(24));
+        scroll.addView(content);
+
+        String description = page == PAGE_SETTINGS ? "Customize Native Symbols."
+                : page == PAGE_APPEARANCE ? "Choose how the app looks."
+                : page == PAGE_COLOR ? "Choose the app's main color."
+                : "Choose how icons appear.";
+        TextView intro = text(description, 14, muted, false);
+        LinearLayout.LayoutParams introParams = new LinearLayout.LayoutParams(-1, -2);
+        introParams.bottomMargin = dp(12);
+        content.addView(intro, introParams);
+
+        if (page == PAGE_SETTINGS) {
+            String appearance = "dark".equals(themeMode) ? "Dark"
+                    : "light".equals(themeMode) ? "Light" : "System";
+            addSettingsLink(content, "Appearance", appearance, PAGE_APPEARANCE);
+            addSettingsLink(content, "App color", COLOR_NAMES[colorIndex], PAGE_COLOR);
+            addSettingsLink(content, "Icon layout", listLayout ? "List" : "Grid", PAGE_LAYOUT);
+        } else if (page == PAGE_APPEARANCE) {
+            addSettingsOption(content, "System", "Follow device setting",
+                    "system".equals(themeMode), 0, () -> selectTheme("system"));
+            addSettingsOption(content, "Light", "Always use the light theme",
+                    "light".equals(themeMode), 0, () -> selectTheme("light"));
+            addSettingsOption(content, "Dark", "Always use the dark theme",
+                    "dark".equals(themeMode), 0, () -> selectTheme("dark"));
+        } else if (page == PAGE_COLOR) {
+            for (int i = 0; i < COLOR_NAMES.length; i++) {
+                final int selected = i;
+                String hex = String.format(Locale.ROOT, "#%06X", PRIMARY_COLORS[i] & 0xFFFFFF);
+                addSettingsOption(content, COLOR_NAMES[i], hex,
+                        colorIndex == i, PRIMARY_COLORS[i], () -> selectColor(selected));
+            }
+        } else {
+            addSettingsOption(content, "Grid", "Compact icon cards",
+                    !listLayout, 0, () -> selectLayout(false));
+            addSettingsOption(content, "List", "Full-width icon rows",
+                    listLayout, 0, () -> selectLayout(true));
+        }
+    }
+
+    private void addSettingsLink(LinearLayout parent, String title, String value, int destination) {
+        LinearLayout row = settingsRow(parent, false);
+        addSettingsText(row, title, value);
+        TextView arrow = text("›", 28, muted, false);
+        arrow.setGravity(Gravity.CENTER);
+        row.addView(arrow, new LinearLayout.LayoutParams(dp(24), -1));
+        row.setContentDescription(title + ", " + value);
+        row.setOnClickListener(v -> showPage(destination));
+    }
+
+    private void addSettingsOption(LinearLayout parent, String title, String detail,
+                                   boolean selected, int swatchColor, Runnable action) {
+        LinearLayout row = settingsRow(parent, selected);
+        if (swatchColor != 0) {
+            View swatch = new View(this);
+            swatch.setBackground(shape(swatchColor, swatchColor));
+            LinearLayout.LayoutParams swatchParams = new LinearLayout.LayoutParams(dp(28), dp(28));
+            swatchParams.rightMargin = dp(14);
+            row.addView(swatch, swatchParams);
+        }
+        addSettingsText(row, title, detail);
+        if (selected) {
+            ImageView check = new ImageView(this);
+            check.setImageResource(R.drawable.ic_md_check);
+            check.setImageTintList(ColorStateList.valueOf(accentText));
+            row.addView(check, new LinearLayout.LayoutParams(dp(24), dp(24)));
+        }
+        row.setContentDescription(title + (selected ? ", selected" : ""));
+        row.setOnClickListener(v -> action.run());
+    }
+
+    private LinearLayout settingsRow(LinearLayout parent, boolean selected) {
+        LinearLayout row = new LinearLayout(this);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(dp(16), 0, dp(16), 0);
+        row.setBackground(shape(surface, selected ? primary : line));
+        row.setClickable(true);
+        row.setFocusable(true);
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, dp(76));
+        params.topMargin = dp(8);
+        parent.addView(row, params);
+        return row;
+    }
+
+    private void addSettingsText(LinearLayout row, String title, String detail) {
+        LinearLayout labels = new LinearLayout(this);
+        labels.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout.LayoutParams labelsParams = new LinearLayout.LayoutParams(0, -2, 1);
+        row.addView(labels, labelsParams);
+        labels.addView(text(title, 16, ink, true));
+        TextView subtitle = text(detail, 13, muted, false);
+        LinearLayout.LayoutParams subtitleParams = new LinearLayout.LayoutParams(-1, -2);
+        subtitleParams.topMargin = dp(4);
+        labels.addView(subtitle, subtitleParams);
+    }
+
+    private void selectTheme(String mode) {
+        if (mode.equals(themeMode)) return;
+        getSharedPreferences(PREFS, MODE_PRIVATE).edit().putString(THEME_KEY, mode).apply();
+        recreate();
+    }
+
+    private void selectColor(int selected) {
+        if (selected == colorIndex) return;
+        getSharedPreferences(PREFS, MODE_PRIVATE).edit().putInt(COLOR_KEY, selected).apply();
+        recreate();
+    }
+
+    private void selectLayout(boolean selectedList) {
+        if (selectedList == listLayout) return;
+        listLayout = selectedList;
+        getSharedPreferences(PREFS, MODE_PRIVATE).edit().putBoolean(LAYOUT_KEY, listLayout).apply();
+        buildSettingsPage();
     }
 
     private void updateFilters() {
@@ -313,29 +487,34 @@ public class MainActivity extends Activity {
         filterCounts.get(1).setText(String.valueOf(systemMatches.size()));
         updateFilters();
         List<IconItem> visible = filter == 0 ? materialMatches : systemMatches;
-        String count = visible.size() + (visible.size() == 1 ? " icon" : " icons");
-        countView.setText(count + (filter == 0 ? " bundled with this app"
-                : " available on this device"));
         results.removeAllViews();
-        int width = getResources().getDisplayMetrics().widthPixels;
-        int columns = width >= dp(600) ? 5 : 3;
-        for (int start = 0; start < visible.size(); start += columns) {
-            LinearLayout row = new LinearLayout(this);
-            row.setOrientation(LinearLayout.HORIZONTAL);
-            results.addView(row, new LinearLayout.LayoutParams(-1, dp(108)));
-            for (int col = 0; col < columns; col++) {
-                LinearLayout.LayoutParams cellParams = new LinearLayout.LayoutParams(0, dp(100), 1);
-                cellParams.setMargins(dp(3), dp(3), dp(3), dp(3));
-                int index = start + col;
-                if (index < visible.size()) row.addView(iconCard(visible.get(index)), cellParams);
-                else row.addView(new View(this), cellParams);
+        if (listLayout) {
+            for (IconItem item : visible) {
+                LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(-1, dp(64));
+                rowParams.setMargins(dp(3), dp(3), dp(3), dp(3));
+                results.addView(iconListRow(item), rowParams);
+            }
+        } else {
+            int width = getResources().getDisplayMetrics().widthPixels;
+            int columns = width >= dp(600) ? 5 : 3;
+            for (int start = 0; start < visible.size(); start += columns) {
+                LinearLayout row = new LinearLayout(this);
+                row.setOrientation(LinearLayout.HORIZONTAL);
+                results.addView(row, new LinearLayout.LayoutParams(-1, dp(108)));
+                for (int col = 0; col < columns; col++) {
+                    LinearLayout.LayoutParams cellParams = new LinearLayout.LayoutParams(0, dp(100), 1);
+                    cellParams.setMargins(dp(3), dp(3), dp(3), dp(3));
+                    int index = start + col;
+                    if (index < visible.size()) row.addView(iconCard(visible.get(index)), cellParams);
+                    else row.addView(new View(this), cellParams);
+                }
             }
         }
         if (visible.isEmpty()) {
-            int otherCount = filter == 0 ? systemMatches.size() : materialMatches.size();
+            boolean otherHasMatches = filter == 0 ? !systemMatches.isEmpty() : !materialMatches.isEmpty();
             String otherName = filter == 0 ? "System" : "Material";
-            TextView empty = text(otherCount > 0
-                    ? "No icons here. Check " + otherName + " (" + otherCount + ")."
+            TextView empty = text(otherHasMatches
+                    ? "No icons here. Check " + otherName + "."
                     : "No icons found. Try another name.", 15, muted, false);
             empty.setGravity(Gravity.CENTER);
             results.addView(empty, new LinearLayout.LayoutParams(-1, dp(180)));
@@ -364,6 +543,28 @@ public class MainActivity extends Activity {
         card.addView(name, nameParams);
         card.setOnClickListener(v -> showDetails(item));
         return card;
+    }
+
+    private View iconListRow(IconItem item) {
+        LinearLayout row = new LinearLayout(this);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(dp(16), 0, dp(16), 0);
+        row.setBackground(shape(surface, line));
+        row.setClickable(true);
+        row.setFocusable(true);
+        row.setContentDescription(displayName(item.name));
+        ImageView image = new ImageView(this);
+        image.setImageResource(item.resourceId);
+        image.setImageTintList(ColorStateList.valueOf(ink));
+        row.addView(image, new LinearLayout.LayoutParams(dp(30), dp(30)));
+        TextView name = text(displayName(item.name), 15, ink, true);
+        name.setSingleLine(true);
+        name.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        LinearLayout.LayoutParams nameParams = new LinearLayout.LayoutParams(0, -2, 1);
+        nameParams.leftMargin = dp(16);
+        row.addView(name, nameParams);
+        row.setOnClickListener(v -> showDetails(item));
+        return row;
     }
 
     private void showDetails(IconItem item) {
@@ -418,6 +619,7 @@ public class MainActivity extends Activity {
         AlertDialog dialog = new AlertDialog.Builder(this).setView(scroll)
                 .setPositiveButton("Done", null).create();
         dialog.show();
+        styleDialog(dialog);
         dialog.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(accentText);
         if (dialog.getWindow() != null) {
             dialog.getWindow().setLayout(getResources().getDisplayMetrics().widthPixels - dp(28),
