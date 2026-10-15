@@ -171,8 +171,7 @@ public class MainActivity extends Activity {
         root.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
         results = new LinearLayout(this);
         results.setOrientation(LinearLayout.VERTICAL);
-        int sidePadding = dp(listLayout ? 32 : 16);
-        results.setPadding(sidePadding, 0, sidePadding, 0);
+        results.setPadding(dp(8), 0, dp(8), 0);
         scroll.addView(results);
         results.addOnLayoutChangeListener((view, left, top, right, bottom,
                                            oldLeft, oldTop, oldRight, oldBottom) -> {
@@ -272,8 +271,6 @@ public class MainActivity extends Activity {
     private void toggleLayout() {
         listLayout = !listLayout;
         getSharedPreferences(PREFS, MODE_PRIVATE).edit().putBoolean(LAYOUT_KEY, listLayout).apply();
-        int sidePadding = dp(listLayout ? 32 : 16);
-        results.setPadding(sidePadding, 0, sidePadding, 0);
         updateLayoutButton();
         renderResults();
     }
@@ -317,8 +314,8 @@ public class MainActivity extends Activity {
         results.removeAllViews();
         if (listLayout) {
             for (IconItem item : visible) {
-                LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(-1, dp(64));
-                rowParams.setMargins(dp(3), dp(3), dp(3), dp(3));
+                LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(-1, dp(56));
+                rowParams.setMargins(dp(1), dp(1), dp(1), dp(1));
                 results.addView(iconListRow(item), rowParams);
             }
         } else {
@@ -326,7 +323,7 @@ public class MainActivity extends Activity {
                     ? results.getWidth() - results.getPaddingLeft() - results.getPaddingRight()
                     : getResources().getDisplayMetrics().widthPixels
                             - results.getPaddingLeft() - results.getPaddingRight();
-            int columns = Math.max(2, Math.min(8, contentWidth / dp(80)));
+            int columns = Math.max(2, Math.min(8, contentWidth / dp(84)));
             int gap = dp(1);
             int cardSize = contentWidth / columns - 2 * gap;
             for (int start = 0; start < visible.size(); start += columns) {
@@ -337,7 +334,7 @@ public class MainActivity extends Activity {
                     LinearLayout.LayoutParams cellParams = new LinearLayout.LayoutParams(0, cardSize, 1);
                     cellParams.setMargins(gap, gap, gap, gap);
                     int index = start + col;
-                    if (index < visible.size()) row.addView(iconCard(visible.get(index)), cellParams);
+                    if (index < visible.size()) row.addView(iconCard(visible.get(index), cardSize), cellParams);
                     else row.addView(new View(this), cellParams);
                 }
             }
@@ -353,11 +350,11 @@ public class MainActivity extends Activity {
         }
     }
 
-    private View iconCard(IconItem item) {
+    private View iconCard(IconItem item, int cardSize) {
         LinearLayout card = new LinearLayout(this);
         card.setOrientation(LinearLayout.VERTICAL);
         card.setGravity(Gravity.CENTER);
-        card.setPadding(dp(3), dp(4), dp(3), dp(4));
+        card.setPadding(dp(3), dp(3), dp(3), dp(3));
         card.setBackground(shape(surface, line));
         card.setClickable(true);
         card.setFocusable(true);
@@ -365,8 +362,9 @@ public class MainActivity extends Activity {
         ImageView image = new ImageView(this);
         image.setImageResource(item.resourceId);
         image.setImageTintList(ColorStateList.valueOf(ink));
-        card.addView(image, new LinearLayout.LayoutParams(dp(24), dp(24)));
-        TextView name = text(displayName(item.name), 10, iconNameColor, true);
+        int iconSize = Math.min(dp(44), Math.round(cardSize * 0.42f));
+        card.addView(image, new LinearLayout.LayoutParams(iconSize, iconSize));
+        TextView name = text(displayName(item.name), 11, iconNameColor, true);
         name.setGravity(Gravity.CENTER);
         name.setMaxLines(2);
         name.setEllipsize(android.text.TextUtils.TruncateAt.END);
@@ -388,7 +386,7 @@ public class MainActivity extends Activity {
         ImageView image = new ImageView(this);
         image.setImageResource(item.resourceId);
         image.setImageTintList(ColorStateList.valueOf(ink));
-        row.addView(image, new LinearLayout.LayoutParams(dp(30), dp(30)));
+        row.addView(image, new LinearLayout.LayoutParams(dp(36), dp(36)));
         TextView name = text(displayName(item.name), 15, iconNameColor, true);
         name.setSingleLine(true);
         name.setEllipsize(android.text.TextUtils.TruncateAt.END);
