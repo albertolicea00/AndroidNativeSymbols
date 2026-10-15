@@ -2,7 +2,6 @@ package com.albertolicea00.nativesymbols;
 
 import android.app.Activity;
 import android.app.AlertDialog;
-import android.app.Dialog;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
@@ -20,7 +19,6 @@ import android.text.style.ForegroundColorSpan;
 import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
-import android.view.Window;
 import android.view.WindowInsets;
 import android.widget.EditText;
 import android.widget.BaseAdapter;
@@ -70,6 +68,8 @@ public class MainActivity extends Activity {
     private GridView results;
     private BaseAdapter resultsAdapter;
     private TextView emptyView;
+    private FrameLayout screen;
+    private FrameLayout detailOverlay;
     private int resultCellSize;
     private EditText searchView;
     private int filter = 0;
@@ -298,6 +298,8 @@ public class MainActivity extends Activity {
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setBackgroundColor(background);
+        screen = new FrameLayout(this);
+        screen.addView(root, new FrameLayout.LayoutParams(-1, -1));
         if (Build.VERSION.SDK_INT >= 30) {
             getWindow().setDecorFitsSystemWindows(false);
             root.setOnApplyWindowInsetsListener((view, insets) -> {
@@ -308,8 +310,24 @@ public class MainActivity extends Activity {
                 return insets;
             });
         }
-        setContentView(root);
+        setContentView(screen);
         return root;
+    }
+
+    @Override
+    public void onBackPressed() {
+        if (detailOverlay != null) {
+            dismissDetails();
+        } else {
+            super.onBackPressed();
+        }
+    }
+
+    private void dismissDetails() {
+        if (detailOverlay != null) {
+            screen.removeView(detailOverlay);
+            detailOverlay = null;
+        }
     }
 
     private void toggleLayout() {
@@ -433,12 +451,16 @@ public class MainActivity extends Activity {
     private void showDetails(IconItem item) {
         boolean landscape = getResources().getConfiguration().orientation
                 == Configuration.ORIENTATION_LANDSCAPE;
-        Dialog dialog = landscape
-                ? new Dialog(this, darkMode ? R.style.DetailSheetThemeDark : R.style.DetailSheetThemeLight)
-                : new Dialog(this);
-        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        dismissDetails();
+        FrameLayout overlay = new FrameLayout(this);
+        overlay.setBackgroundColor(0x66000000);
+        overlay.setOnClickListener(v -> dismissDetails());
+        screen.addView(overlay, new FrameLayout.LayoutParams(-1, -1));
+        detailOverlay = overlay;
+        Runnable dismiss = this::dismissDetails;
         LinearLayout sheet = new LinearLayout(this);
         sheet.setOrientation(LinearLayout.VERTICAL);
+        sheet.setClickable(true);
         GradientDrawable sheetBackground = new GradientDrawable();
         sheetBackground.setColor(surface);
         sheet.setBackground(sheetBackground);
@@ -464,9 +486,9 @@ public class MainActivity extends Activity {
         FrameLayout.LayoutParams closeParams = new FrameLayout.LayoutParams(dp(48), dp(48), Gravity.TOP | Gravity.END);
         closeParams.rightMargin = dp(8);
         header.addView(close, closeParams);
-        close.setOnClickListener(v -> dialog.dismiss());
+        close.setOnClickListener(v -> dismissDetails());
 
-        ScrollView scroll = detailScroll(sheet, dialog);
+        ScrollView scroll = detailScroll(sheet, dismiss);
         scroll.setFillViewport(true);
         scroll.setVerticalScrollBarEnabled(false);
         sheet.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
@@ -524,18 +546,21 @@ public class MainActivity extends Activity {
             content.addView(note, noteParams);
         }
 
-        header.setOnTouchListener(sheetDragListener(sheet, dialog));
-        dialog.setContentView(sheet);
-        dialog.show();
-        if (dialog.getWindow() != null) {
-            Window window = dialog.getWindow();
-            window.setBackgroundDrawableResource(android.R.color.transparent);
-            window.setGravity(Gravity.BOTTOM);
-            window.setLayout(-1, Math.round(getResources().getDisplayMetrics().heightPixels * 0.8f));
+        header.setOnTouchListener(sheetDragListener(sheet, dismiss));
+        int sheetHeight = Math.round((screen.getHeight() > 0
+                ? screen.getHeight() : getResources().getDisplayMetrics().heightPixels) * 0.8f);
+        overlay.addView(sheet, new FrameLayout.LayoutParams(-1, sheetHeight, Gravity.BOTTOM));
+        if (Build.VERSION.SDK_INT >= 30) {
+            overlay.setOnApplyWindowInsetsListener((view, insets) -> {
+                android.graphics.Insets bars = insets.getInsets(WindowInsets.Type.systemBars());
+                sheet.setPadding(bars.left, 0, bars.right, bars.bottom);
+                return insets;
+            });
+            overlay.requestApplyInsets();
         }
     }
 
-    private ScrollView detailScroll(View sheet, Dialog dialog) {
+    private ScrollView detailScroll(View sheet, Runnable dismiss) {
         return new ScrollView(this) {
             private float startY;
             private boolean dragging;
@@ -568,7 +593,7 @@ public class MainActivity extends Activity {
                     case MotionEvent.ACTION_UP:
                     case MotionEvent.ACTION_CANCEL:
                         if (dragging) {
-                            finishSheetDrag(sheet, dialog, event);
+                            finishSheetDrag(sheet, dismiss, event);
                             dragging = false;
                             return true;
                         }
@@ -579,7 +604,7 @@ public class MainActivity extends Activity {
         };
     }
 
-    private View.OnTouchListener sheetDragListener(View sheet, Dialog dialog) {
+    private View.OnTouchListener sheetDragListener(View sheet, Runnable dismiss) {
         return new View.OnTouchListener() {
             private float startY;
             private boolean dragging;
@@ -600,7 +625,7 @@ public class MainActivity extends Activity {
                     case MotionEvent.ACTION_UP:
                     case MotionEvent.ACTION_CANCEL:
                         if (dragging) {
-                            finishSheetDrag(sheet, dialog, event);
+                            finishSheetDrag(sheet, dismiss, event);
                             dragging = false;
                         }
                         return true;
@@ -611,9 +636,9 @@ public class MainActivity extends Activity {
         };
     }
 
-    private void finishSheetDrag(View sheet, Dialog dialog, MotionEvent event) {
+    private void finishSheetDrag(View sheet, Runnable dismiss, MotionEvent event) {
         if (event.getActionMasked() == MotionEvent.ACTION_UP && sheet.getTranslationY() > dp(100)) {
-            dialog.dismiss();
+            dismiss.run();
         } else {
             sheet.animate().translationY(0).setDuration(180).start();
         }
