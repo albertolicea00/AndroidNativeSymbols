@@ -24,10 +24,15 @@ android.applicationVariants.all { variant ->
     }
 
     def capitalizedVariant = channel.capitalize()
-    def exportBundle = tasks.register("export${capitalizedVariant}Bundle", Copy) {
-        from(layout.buildDirectory.file("outputs/bundle/${channel}/app-${channel}.aab"))
-        into(layout.buildDirectory.dir("outputs/named"))
-        rename { "${artifactName}.aab" }
+    def exportBundle = tasks.register("export${capitalizedVariant}Bundle") {
+        doLast {
+            def sourceBundle = layout.buildDirectory.file("outputs/bundle/${channel}/app-${channel}.aab").get().asFile
+            def namedBundle = layout.buildDirectory.file("outputs/bundle/${channel}/${artifactName}.aab").get().asFile
+            namedBundle.parentFile.mkdirs()
+            sourceBundle.withInputStream { input ->
+                namedBundle.withOutputStream { output -> output << input }
+            }
+        }
     }
 
     tasks.named("bundle${capitalizedVariant}") {
