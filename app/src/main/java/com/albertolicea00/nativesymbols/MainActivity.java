@@ -171,7 +171,8 @@ public class MainActivity extends Activity {
         root.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
         results = new LinearLayout(this);
         results.setOrientation(LinearLayout.VERTICAL);
-        results.setPadding(dp(32), 0, dp(32), 0);
+        int sidePadding = dp(listLayout ? 32 : 16);
+        results.setPadding(sidePadding, 0, sidePadding, 0);
         scroll.addView(results);
         results.addOnLayoutChangeListener((view, left, top, right, bottom,
                                            oldLeft, oldTop, oldRight, oldBottom) -> {
@@ -271,6 +272,8 @@ public class MainActivity extends Activity {
     private void toggleLayout() {
         listLayout = !listLayout;
         getSharedPreferences(PREFS, MODE_PRIVATE).edit().putBoolean(LAYOUT_KEY, listLayout).apply();
+        int sidePadding = dp(listLayout ? 32 : 16);
+        results.setPadding(sidePadding, 0, sidePadding, 0);
         updateLayoutButton();
         renderResults();
     }
@@ -321,7 +324,8 @@ public class MainActivity extends Activity {
         } else {
             int contentWidth = results.getWidth() > 0
                     ? results.getWidth() - results.getPaddingLeft() - results.getPaddingRight()
-                    : getResources().getDisplayMetrics().widthPixels - dp(64);
+                    : getResources().getDisplayMetrics().widthPixels
+                            - results.getPaddingLeft() - results.getPaddingRight();
             int columns = Math.max(2, Math.min(8, contentWidth / dp(80)));
             int gap = dp(1);
             int cardSize = contentWidth / columns - 2 * gap;
