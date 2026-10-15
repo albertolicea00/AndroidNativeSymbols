@@ -42,13 +42,14 @@ def main() -> None:
             radius=round(size * 0.22),
             fill="white",
         )
-        logo = fitted(artwork, round(size * 0.82))
+        logo = fitted(artwork, round(size * 0.68))
         legacy.alpha_composite(logo, ((size - logo.width) // 2, (size - logo.height) // 2))
         legacy.save(target / "ic_launcher.png", optimize=True)
 
         adaptive_size = round(size * 108 / 48)
         foreground = Image.new("RGBA", (adaptive_size, adaptive_size), (0, 0, 0, 0))
-        logo = fitted(artwork, round(adaptive_size * 0.60))
+        # Keep even the bottom corners of the lettering inside Android's circular mask.
+        logo = fitted(artwork, round(adaptive_size * 0.42))
         foreground.alpha_composite(
             logo,
             ((adaptive_size - logo.width) // 2, (adaptive_size - logo.height) // 2),
