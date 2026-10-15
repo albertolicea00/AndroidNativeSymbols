@@ -431,7 +431,11 @@ public class MainActivity extends Activity {
     }
 
     private void showDetails(IconItem item) {
-        Dialog dialog = new Dialog(this);
+        boolean landscape = getResources().getConfiguration().orientation
+                == Configuration.ORIENTATION_LANDSCAPE;
+        Dialog dialog = landscape
+                ? new Dialog(this, darkMode ? R.style.DetailSheetThemeDark : R.style.DetailSheetThemeLight)
+                : new Dialog(this);
         dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
         LinearLayout sheet = new LinearLayout(this);
         sheet.setOrientation(LinearLayout.VERTICAL);
@@ -476,22 +480,26 @@ public class MainActivity extends Activity {
         preview.setImageResource(item.resourceId);
         if (!item.material) preview.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
         preview.setImageTintList(ColorStateList.valueOf(primary));
-        LinearLayout.LayoutParams previewParams = new LinearLayout.LayoutParams(dp(56), dp(56));
-        previewParams.gravity = Gravity.CENTER_HORIZONTAL;
-        content.addView(preview, previewParams);
-
         TextView title = text(displayName(item.name), 22, ink, true);
-        title.setGravity(Gravity.CENTER);
-        LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(-1, -2);
-        titleParams.topMargin = dp(8);
-        content.addView(title, titleParams);
-
         TextView kind = text(item.material ? "LOCAL MATERIAL VECTOR" : "ANDROID SYSTEM DRAWABLE", 11, accentText, true);
-        kind.setGravity(Gravity.CENTER);
         kind.setLetterSpacing(0.08f);
+        LinearLayout identity = new LinearLayout(this);
+        identity.setGravity(Gravity.CENTER_VERTICAL);
+        identity.setMinimumHeight(dp(56));
+        content.addView(identity, new LinearLayout.LayoutParams(-1, -2));
+        identity.addView(preview, new LinearLayout.LayoutParams(dp(56), dp(56)));
+
+        LinearLayout labels = new LinearLayout(this);
+        labels.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout.LayoutParams labelsParams = new LinearLayout.LayoutParams(0, -2, 1);
+        labelsParams.leftMargin = dp(16);
+        identity.addView(labels, labelsParams);
+        title.setMaxLines(landscape ? 1 : 2);
+        title.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        labels.addView(title, new LinearLayout.LayoutParams(-1, -2));
         LinearLayout.LayoutParams kindParams = new LinearLayout.LayoutParams(-1, -2);
-        kindParams.topMargin = dp(4);
-        content.addView(kind, kindParams);
+        kindParams.topMargin = dp(2);
+        labels.addView(kind, kindParams);
 
         TextView note = text(item.material
                 ? "Add this vector XML to res/drawable before using the snippets below."
