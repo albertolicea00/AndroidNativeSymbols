@@ -12,6 +12,7 @@ captures/
 # Local Android SDK and IDE state
 local.properties
 .idea/
+.workspace/
 *.iml
 *.ipr
 *.iws
