@@ -3,14 +3,25 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Android-6.0%2B-3DDC84?style=flat-square&amp;logo=android&amp;logoColor=white" alt="Android 6.0+">
-  <img src="https://img.shields.io/badge/Offline-Yes-2E7D32?style=flat-square" alt="Offline">
-  <img src="https://img.shields.io/badge/Code-XML%20%7C%20Kotlin%20%7C%20Java-4263EB?style=flat-square" alt="XML, Kotlin, and Java snippets">
+  <img src=".github/green-dot.svg" width="8" height="8" alt=""> Android 6.0+
+  &nbsp;&nbsp;
+  <img src=".github/green-dot.svg" width="8" height="8" alt=""> XML
+  &nbsp;&nbsp;
+  <img src=".github/green-dot.svg" width="8" height="8" alt=""> Kotlin
+  &nbsp;&nbsp;
+  <img src=".github/green-dot.svg" width="8" height="8" alt=""> Java snippets
+</p>
+
+<p align="center">
+  <a href="https://play.google.com/store/apps/details?id=com.albertolicea00.nativesymbols">
+    <img src="https://img.shields.io/badge/Download_on-Google_Play-34A853?style=for-the-badge&amp;logo=googleplay&amp;logoColor=white" alt="Download on Google Play">
+  </a>
 </p>
 
 <p align="center">
 A small, fully native Android app for exploring icons and copying the code needed to use them. It runs offline and uses Android platform UI components, with no icon library or AndroidX dependencies.
 </p>
+
 
 ## ✨ What you can do
 
