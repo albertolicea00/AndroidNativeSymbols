@@ -8,6 +8,7 @@
     <color name="surface_light">#FFFFFF</color>
     <color name="code_light">#F0F6F1</color>
     <color name="ink_light">#1B2A20</color>
+    <color name="icon_name_light">#0B130D</color>
     <color name="muted_light">#5F7165</color>
     <color name="line_light">#DCE7DF</color>
     <color name="background_dark">#101712</color>

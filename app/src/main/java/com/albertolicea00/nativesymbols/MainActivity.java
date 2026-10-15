@@ -38,6 +38,7 @@ public class MainActivity extends Activity {
     private static final String LAYOUT_KEY = "icon_layout";
 
     private int ink;
+    private int iconNameColor;
     private int muted;
     private int primary;
     private int onPrimary;
@@ -112,6 +113,7 @@ public class MainActivity extends Activity {
         surface = getColor(darkMode ? R.color.surface_dark : R.color.surface_light);
         codeBackground = getColor(darkMode ? R.color.code_dark : R.color.code_light);
         ink = getColor(darkMode ? R.color.ink_dark : R.color.ink_light);
+        iconNameColor = getColor(darkMode ? R.color.ink_dark : R.color.icon_name_light);
         muted = getColor(darkMode ? R.color.muted_dark : R.color.muted_light);
         line = getColor(darkMode ? R.color.line_dark : R.color.line_light);
     }
@@ -169,7 +171,7 @@ public class MainActivity extends Activity {
         root.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
         results = new LinearLayout(this);
         results.setOrientation(LinearLayout.VERTICAL);
-        results.setPadding(dp(20), 0, dp(20), 0);
+        results.setPadding(dp(32), 0, dp(32), 0);
         scroll.addView(results);
         results.addOnLayoutChangeListener((view, left, top, right, bottom,
                                            oldLeft, oldTop, oldRight, oldBottom) -> {
@@ -309,16 +311,17 @@ public class MainActivity extends Activity {
         } else {
             int contentWidth = results.getWidth() > 0
                     ? results.getWidth() - results.getPaddingLeft() - results.getPaddingRight()
-                    : getResources().getDisplayMetrics().widthPixels - dp(40);
+                    : getResources().getDisplayMetrics().widthPixels - dp(64);
             int columns = Math.max(2, Math.min(8, contentWidth / dp(80)));
-            int cardSize = contentWidth / columns - dp(6);
+            int gap = dp(1);
+            int cardSize = contentWidth / columns - 2 * gap;
             for (int start = 0; start < visible.size(); start += columns) {
                 LinearLayout row = new LinearLayout(this);
                 row.setOrientation(LinearLayout.HORIZONTAL);
-                results.addView(row, new LinearLayout.LayoutParams(-1, cardSize + dp(6)));
+                results.addView(row, new LinearLayout.LayoutParams(-1, cardSize + 2 * gap));
                 for (int col = 0; col < columns; col++) {
                     LinearLayout.LayoutParams cellParams = new LinearLayout.LayoutParams(0, cardSize, 1);
-                    cellParams.setMargins(dp(3), dp(3), dp(3), dp(3));
+                    cellParams.setMargins(gap, gap, gap, gap);
                     int index = start + col;
                     if (index < visible.size()) row.addView(iconCard(visible.get(index)), cellParams);
                     else row.addView(new View(this), cellParams);
@@ -349,7 +352,7 @@ public class MainActivity extends Activity {
         image.setImageResource(item.resourceId);
         image.setImageTintList(ColorStateList.valueOf(ink));
         card.addView(image, new LinearLayout.LayoutParams(dp(24), dp(24)));
-        TextView name = text(displayName(item.name), 10, ink, true);
+        TextView name = text(displayName(item.name), 10, iconNameColor, true);
         name.setGravity(Gravity.CENTER);
         name.setMaxLines(2);
         name.setEllipsize(android.text.TextUtils.TruncateAt.END);
@@ -372,7 +375,7 @@ public class MainActivity extends Activity {
         image.setImageResource(item.resourceId);
         image.setImageTintList(ColorStateList.valueOf(ink));
         row.addView(image, new LinearLayout.LayoutParams(dp(30), dp(30)));
-        TextView name = text(displayName(item.name), 15, ink, true);
+        TextView name = text(displayName(item.name), 15, iconNameColor, true);
         name.setSingleLine(true);
         name.setEllipsize(android.text.TextUtils.TruncateAt.END);
         LinearLayout.LayoutParams nameParams = new LinearLayout.LayoutParams(0, -2, 1);
