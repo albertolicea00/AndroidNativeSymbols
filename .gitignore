@@ -1,4 +1,5 @@
 # Gradle and Android build output
+app/release/output-metadata.json
 .gradle/
 .kotlin/
 **/build/
