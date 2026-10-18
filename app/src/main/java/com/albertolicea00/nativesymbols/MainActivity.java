@@ -21,7 +21,6 @@ import android.text.style.ForegroundColorSpan;
 import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
-import android.view.WindowInsets;
 import android.widget.EditText;
 import android.widget.BaseAdapter;
 import android.widget.FrameLayout;
@@ -31,6 +30,11 @@ import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
+
+import androidx.core.graphics.Insets;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowCompat;
+import androidx.core.view.WindowInsetsCompat;
 
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
@@ -105,15 +109,7 @@ public class MainActivity extends Activity {
         setTheme(darkMode ? R.style.AppThemeDark : R.style.AppThemeLight);
         super.onCreate(state);
         applyPalette();
-        getWindow().setStatusBarColor(background);
-        int navigationBar = !darkMode && Build.VERSION.SDK_INT < 26
-                ? getColor(R.color.accent_light) : surface;
-        getWindow().setNavigationBarColor(navigationBar);
-        int systemUiVisibility = darkMode ? 0 : View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
-        if (!darkMode && Build.VERSION.SDK_INT >= 26) {
-            systemUiVisibility |= View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
-        }
-        getWindow().getDecorView().setSystemUiVisibility(systemUiVisibility);
+        WindowCompat.enableEdgeToEdge(getWindow());
         if (state != null) filter = Math.max(0, Math.min(1, state.getInt("filter", 0)));
         loadIcons();
         buildScreen();
@@ -329,17 +325,15 @@ public class MainActivity extends Activity {
         root.setOrientation(LinearLayout.VERTICAL);
         root.setBackgroundColor(background);
         screen = new FrameLayout(this);
+        screen.setBackgroundColor(background);
         screen.addView(root, new FrameLayout.LayoutParams(-1, -1));
-        if (Build.VERSION.SDK_INT >= 30) {
-            getWindow().setDecorFitsSystemWindows(false);
-            root.setOnApplyWindowInsetsListener((view, insets) -> {
-                android.graphics.Insets bars = insets.getInsets(WindowInsets.Type.systemBars());
-                android.graphics.Insets keyboard = insets.getInsets(WindowInsets.Type.ime());
-                view.setPadding(bars.left, bars.top, bars.right,
-                        Math.max(bars.bottom, keyboard.bottom));
-                return insets;
-            });
-        }
+        ViewCompat.setOnApplyWindowInsetsListener(root, (view, insets) -> {
+            Insets bars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
+            Insets keyboard = insets.getInsets(WindowInsetsCompat.Type.ime());
+            view.setPadding(bars.left, bars.top, bars.right,
+                    Math.max(bars.bottom, keyboard.bottom));
+            return insets;
+        });
         setContentView(screen);
         return root;
     }
@@ -464,14 +458,12 @@ public class MainActivity extends Activity {
         int sheetHeight = Math.round((screen.getHeight() > 0
                 ? screen.getHeight() : getResources().getDisplayMetrics().heightPixels) * 0.8f);
         overlay.addView(sheet, new FrameLayout.LayoutParams(-1, sheetHeight, Gravity.BOTTOM));
-        if (Build.VERSION.SDK_INT >= 30) {
-            overlay.setOnApplyWindowInsetsListener((view, insets) -> {
-                android.graphics.Insets bars = insets.getInsets(WindowInsets.Type.systemBars());
-                sheet.setPadding(bars.left, 0, bars.right, bars.bottom);
-                return insets;
-            });
-            overlay.requestApplyInsets();
-        }
+        ViewCompat.setOnApplyWindowInsetsListener(overlay, (view, insets) -> {
+            Insets bars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
+            sheet.setPadding(bars.left, 0, bars.right, bars.bottom);
+            return insets;
+        });
+        ViewCompat.requestApplyInsets(overlay);
     }
 
     private void dismissInfoPage() {
@@ -757,14 +749,12 @@ public class MainActivity extends Activity {
         int sheetHeight = Math.round((screen.getHeight() > 0
                 ? screen.getHeight() : getResources().getDisplayMetrics().heightPixels) * 0.8f);
         overlay.addView(sheet, new FrameLayout.LayoutParams(-1, sheetHeight, Gravity.BOTTOM));
-        if (Build.VERSION.SDK_INT >= 30) {
-            overlay.setOnApplyWindowInsetsListener((view, insets) -> {
-                android.graphics.Insets bars = insets.getInsets(WindowInsets.Type.systemBars());
-                sheet.setPadding(bars.left, 0, bars.right, bars.bottom);
-                return insets;
-            });
-            overlay.requestApplyInsets();
-        }
+        ViewCompat.setOnApplyWindowInsetsListener(overlay, (view, insets) -> {
+            Insets bars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
+            sheet.setPadding(bars.left, 0, bars.right, bars.bottom);
+            return insets;
+        });
+        ViewCompat.requestApplyInsets(overlay);
     }
 
     private final class SheetHeader extends FrameLayout {

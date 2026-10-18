@@ -13,14 +13,26 @@ android {
         versionCode 2
         versionName '1.0.1'
     }
+
+    buildTypes {
+        release {
+            minifyEnabled = true
+            shrinkResources = true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt')
+        }
+    }
 }
 
-android.applicationVariants.all { variant ->
-    def channel = variant.name
-    def artifactName = "Native-Symbols-v${variant.versionName}-${channel}-build${variant.versionCode}"
+dependencies {
+    implementation 'androidx.core:core:1.17.0'
+}
 
-    variant.outputs.all {
-        outputFileName = "${artifactName}.apk"
+androidComponents.onVariants(androidComponents.selector().all()) { variant ->
+    def channel = variant.name
+    def artifactName = "Native-Symbols-v${android.defaultConfig.versionName}-${channel}-build${android.defaultConfig.versionCode}"
+
+    variant.outputs.each { output ->
+        output.outputFileName.set("${artifactName}.apk")
     }
 
     def capitalizedVariant = channel.capitalize()
@@ -35,7 +47,9 @@ android.applicationVariants.all { variant ->
         }
     }
 
-    tasks.named("bundle${capitalizedVariant}") {
-        finalizedBy(exportBundle)
+    tasks.configureEach {
+        if (name == "bundle${capitalizedVariant}") {
+            finalizedBy(exportBundle)
+        }
     }
 }
